@@ -15,39 +15,52 @@ Scikit-learn uses a set of random number generators with their specific seeding 
 A "fix" would be to have  a C++-compatible interface and plug-it it everywhere (replacing the existing methods).
 
 1. numpy.random.RandomState
+
    Used almost everywhere in a uniform way for training models (fit methods).
    Container for the slow Mersenne Twister pseudo-random number generator ???.
    Consider using a different BitGenerator with the Generator container instead ???.
    https://numpy.org/doc/stable/reference/random/legacy.html#numpy.random.RandomState
 
 2. std::mt19937. The C++ starndard random number generator (Mersenne Twister).
+
    Defined in svm/src/newrand/newrand.h
+
 // Scikit-Learn-specific random number generator replacing `rand()` originally
 // used in LibSVM / LibLinear, to ensure the same behaviour on windows-linux,
 // with increased speed
 // - (1) Init a `mt_rand` object
+```
 std::mt19937 mt_rand(std::mt19937::default_seed);
+```
 
 https://github.com/scikit-learn/scikit-learn/blob/d90dd114ab85b85e49facdb7b37242b7362696c8/sklearn/svm/src/newrand/newrand.h#L21
 
 3. bounded_rand_int
+
    Used in svms. Uses lrand48()
+
    Defined in svm/src/newrand/newrand.h
 
+```
    uint32_t bounded_rand_int(uint32_t iUpperLimit) {
         auto out = (lrand48() + iUpperLimit) % iUpperLimit;
         return out; 
   }
+```
 
   https://github.com/scikit-learn/scikit-learn/blob/d90dd114ab85b85e49facdb7b37242b7362696c8/sklearn/svm/src/newrand/newrand.h#L29
 
 4. our_rand_r
-   # rand_r replacement using a 32bit XorShift generator
-   # See http://www.jstatsoft.org/v08/i14/paper for details
+   rand_r replacement using a 32bit XorShift generator
+   See http://www.jstatsoft.org/v08/i14/paper for details
+
    Defined in ./utils/_random.pxd
+
    Used in decision tree models, linear models etc
-https://github.com/scikit-learn/scikit-learn/blob/d90dd114ab85b85e49facdb7b37242b7362696c8/sklearn/utils/_random.pxd#L26
    
+https://github.com/scikit-learn/scikit-learn/blob/d90dd114ab85b85e49facdb7b37242b7362696c8/sklearn/utils/_random.pxd#L26
+
+```
    RAND_R_MAX = 2147483647
    cdef inline UINT32_t our_rand_r(UINT32_t* seed) nogil:
     """Generate a pseudo-random np.uint32 from a np.uint32 seed"""
@@ -64,5 +77,5 @@ https://github.com/scikit-learn/scikit-learn/blob/d90dd114ab85b85e49facdb7b37242
     # Note that the parenthesis are needed to avoid overflow: here
     # RAND_R_MAX is cast to UINT32_t before 1 is added.
     return seed[0] % ((<UINT32_t>RAND_R_MAX) + 1)
-
+```
 
