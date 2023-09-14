@@ -45,6 +45,8 @@ from ..utils.validation import check_is_fitted
 from ._base import ACTIVATIONS, DERIVATIVES, LOSS_FUNCTIONS
 from ._stochastic_optimizers import AdamOptimizer, SGDOptimizer
 
+import reproducible_random as rep_rand
+
 _STOCHASTIC_SOLVERS = ["sgd", "adam"]
 
 
@@ -351,7 +353,6 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         self._compute_loss_grad(
             last, n_samples, activations, deltas, coef_grads, intercept_grads
         )
-
         inplace_derivative = DERIVATIVES[self.activation]
         # Iterate over the hidden layers
         for i in range(self.n_layers_ - 2, 0, -1):
@@ -364,12 +365,37 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
 
         return loss, coef_grads, intercept_grads
 
+    def get_layer_name(self, i):
+        name = ""
+        if(i == 0):
+            name = "Input_Layer"
+        elif(i == (self.n_layers_ - 1)):
+            name = "Output_Layer"
+        else: 
+            name = "Hidden_Layer_" + str(i)
+        return name
+    
+    def dump_layer(self, i, coefs, intercepts):
+        pass
+    
+    def dump_layer__(self, i, coefs, intercepts):
+        name = self.get_layer_name(i)
+        print("DUMP_LAYER_START '" + name + "'")
+        print("DUMP_LAYER_INPUTS_OUTPUTS", coefs.shape[0], coefs.shape[1] )
+        for i in range(coefs.shape[0]):
+            print("DUMP_LAYER_COEFFS", i,   coefs[i, :])
+        print("DUMP_LAYER_INTERCEPTS", intercepts)    
+        print("DUMP_LAYER_END '" + name + "'")
+
     def _initialize(self, y, layer_units, dtype):
         # set all attributes, allocate weights etc. for first call
         # Initialize parameters
         self.n_iter_ = 0
         self.t_ = 0
         self.n_outputs_ = y.shape[1]
+        self.RandGen = rep_rand.ReproducibleGenerator()
+        self.RandGen.set_seed(1789)
+
 
         # Compute the number of layers
         self.n_layers_ = len(layer_units)
@@ -388,12 +414,15 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         self.coefs_ = []
         self.intercepts_ = []
 
+
         for i in range(self.n_layers_ - 1):
             coef_init, intercept_init = self._init_coef(
                 layer_units[i], layer_units[i + 1], dtype
             )
             self.coefs_.append(coef_init)
             self.intercepts_.append(intercept_init)
+            self.dump_layer(i, coef_init, intercept_init)
+
 
         if self.solver in _STOCHASTIC_SOLVERS:
             self.loss_curve_ = []
@@ -408,18 +437,19 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
                 self.best_validation_score_ = None
 
     def _init_coef(self, fan_in, fan_out, dtype):
+        
         # Use the initialization method recommended by
         # Glorot et al.
         factor = 6.0
         if self.activation == "logistic":
             factor = 2.0
         init_bound = np.sqrt(factor / (fan_in + fan_out))
-
         # Generate weights and bias:
-        coef_init = self._random_state.uniform(
-            -init_bound, init_bound, (fan_in, fan_out)
+        coef_init = self.RandGen.generate_double_sequence(
+            -init_bound, init_bound, fan_in * fan_out
         )
-        intercept_init = self._random_state.uniform(-init_bound, init_bound, fan_out)
+        coef_init = coef_init.reshape((fan_in, fan_out))
+        intercept_init = self.RandGen.generate_double_sequence(-init_bound, init_bound, fan_out)
         coef_init = coef_init.astype(dtype, copy=False)
         intercept_init = intercept_init.astype(dtype, copy=False)
         return coef_init, intercept_init
@@ -658,6 +688,10 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
                 # update no_improvement_count based on training loss or
                 # validation score according to early_stopping
                 self._update_no_improvement_count(early_stopping, X_val, y_val)
+
+                for i in range(len(self.coefs_)):
+                    self.dump_layer(i+1, self.coefs_[i], self.intercepts_[i])
+
 
                 # for learning rate that needs to be updated at iteration end
                 self._optimizer.iteration_ends(self.t_)
