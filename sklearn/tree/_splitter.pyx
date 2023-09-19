@@ -15,6 +15,7 @@ cimport numpy as cnp
 
 from ._criterion cimport Criterion
 
+from libc.stdio cimport printf
 from libc.stdlib cimport qsort
 from libc.string cimport memcpy
 from libc.math cimport isnan
@@ -25,12 +26,19 @@ import numpy as np
 from scipy.sparse import issparse
 
 from ._utils cimport log
-from ._utils cimport rand_int
-from ._utils cimport rand_uniform
 from ._utils cimport RAND_R_MAX
 
 cdef double INFINITY = np.inf
 
+
+# Declare random generator with cdef
+cdef extern from "reproducible_rand_for_tree.h" namespace "rep":
+    cdef cppclass cReproducibleRandomNumberGenerator:
+        cReproducibleRandomNumberGenerator() nogil except +
+        void set_seed(size_t iSeed) nogil 
+        size_t rand_int(size_t low, size_t high) nogil
+        double rand_uniform(double min_value, double max_value) nogil
+	
 # Mitigate precision differences between 32 bit and 64 bit
 cdef DTYPE_t FEATURE_THRESHOLD = 1e-7
 
@@ -150,7 +158,7 @@ cdef class Splitter:
             At least one missing values is in X.
         """
 
-        self.rand_r_state = self.random_state.randint(0, RAND_R_MAX)
+	# self.rand_r_state = self.random_state.randint(0, RAND_R_MAX)
         cdef SIZE_t n_samples = X.shape[0]
 
         # Create a new array which will be used to store nonzero
@@ -320,7 +328,7 @@ cdef inline int node_split_best(
     cdef SIZE_t max_features = splitter.max_features
     cdef SIZE_t min_samples_leaf = splitter.min_samples_leaf
     cdef double min_weight_leaf = splitter.min_weight_leaf
-    cdef UINT32_t* random_state = &splitter.rand_r_state
+    # cdef UINT32_t* random_state = &splitter.rand_r_state
 
     cdef SplitRecord best_split, current_split
     cdef double current_proxy_improvement = -INFINITY
@@ -330,6 +338,10 @@ cdef inline int node_split_best(
     cdef SIZE_t f_j
     cdef SIZE_t p
     cdef SIZE_t p_prev
+
+    cdef cReproducibleRandomNumberGenerator lGen
+    lGen.set_seed(1789)
+
 
     cdef SIZE_t n_visited_features = 0
     # Number of features discovered to be constant during the split search
@@ -373,8 +385,7 @@ cdef inline int node_split_best(
         #   and aren't constant.
 
         # Draw a feature at random
-        f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
-                       random_state)
+        f_j = lGen.rand_int(n_drawn_constants, f_i - n_found_constants)
 
         if f_j < n_known_constants:
             # f_j in the interval [n_drawn_constants, n_known_constants[
@@ -385,6 +396,7 @@ cdef inline int node_split_best(
 
         # f_j in the interval [n_known_constants, f_i - n_found_constants[
         f_j += n_found_constants
+
         # f_j in the interval [n_total_constants, f_i[
         current_split.feature = features[f_j]
         partitioner.sort_samples_and_feature_values(current_split.feature)
@@ -686,6 +698,9 @@ cdef inline int node_split_random(
     cdef SIZE_t start = splitter.start
     cdef SIZE_t end = splitter.end
 
+    cdef cReproducibleRandomNumberGenerator lGen
+    lGen.set_seed(1789)
+
     cdef SIZE_t[::1] features = splitter.features
     cdef SIZE_t[::1] constant_features = splitter.constant_features
     cdef SIZE_t n_features = splitter.n_features
@@ -693,7 +708,7 @@ cdef inline int node_split_random(
     cdef SIZE_t max_features = splitter.max_features
     cdef SIZE_t min_samples_leaf = splitter.min_samples_leaf
     cdef double min_weight_leaf = splitter.min_weight_leaf
-    cdef UINT32_t* random_state = &splitter.rand_r_state
+    # cdef UINT32_t* random_state = &splitter.rand_r_state
 
     cdef SplitRecord best_split, current_split
     cdef double current_proxy_improvement = - INFINITY
@@ -744,8 +759,7 @@ cdef inline int node_split_random(
         #   and aren't constant.
 
         # Draw a feature at random
-        f_j = rand_int(n_drawn_constants, f_i - n_found_constants,
-                       random_state)
+        f_j = lGen.rand_int(n_drawn_constants, f_i - n_found_constants)
 
         if f_j < n_known_constants:
             # f_j in the interval [n_drawn_constants, n_known_constants[
@@ -775,10 +789,9 @@ cdef inline int node_split_random(
         features[f_i], features[f_j] = features[f_j], features[f_i]
 
         # Draw a random threshold
-        current_split.threshold = rand_uniform(
+        current_split.threshold = lGen.rand_uniform(
             min_feature_value,
             max_feature_value,
-            random_state,
         )
 
         if current_split.threshold == max_feature_value:
@@ -904,6 +917,7 @@ cdef class DensePartitioner:
             SIZE_t n_missing = 0
             const unsigned char[::1] missing_values_in_feature_mask = self.missing_values_in_feature_mask
 
+
         # Sort samples along that feature; by
         # copying the values into an array and
         # sorting the array in a manner which utilizes the cache more
@@ -974,6 +988,7 @@ cdef class DensePartitioner:
         cdef:
             DTYPE_t[::1] feature_values = self.feature_values
             SIZE_t end_non_missing = self.end - self.n_missing
+
 
         while (
             p[0] + 1 < end_non_missing and
