@@ -72,7 +72,187 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <random>
 #include "svm.h"
 #include "_svm_cython_blas_helpers.h"
-#include "../newrand/newrand.h"
+// #include "../newrand/newrand.h"
+
+#include <iostream>
+#include <sstream>
+#include <chrono>
+#include<ctime>
+#include<string>
+
+#ifndef HAS_REPRODUCIBLE_RAND
+#define HAS_REPRODUCIBLE_RAND 1  
+
+namespace {
+
+  class cReproducibleRandomNumberGenerator {
+    size_t mSeed;
+    ::std::mt19937 mGenerator;
+
+  public:
+    cReproducibleRandomNumberGenerator() : mSeed(1789), mGenerator(){
+      mGenerator.seed(mSeed);
+    }
+
+    ~cReproducibleRandomNumberGenerator() {
+
+    }
+
+    void set_seed(size_t iSeed) {
+      ::std::cout << "cReproducibleRandomNumberGenerator SET_SEED " << iSeed << std::endl << std::flush;
+      mSeed = iSeed;
+      mGenerator.seed(mSeed);
+    }
+
+    size_t rand_int(size_t low, size_t high) {
+      auto lDist = ::std::uniform_int_distribution<size_t>(low, high - 1);
+      auto int_rand = lDist(mGenerator);
+      ::std::cout << "cReproducibleRandomNumberGenerator RAND_INT " << low << " " << high
+		  << " " << int_rand << std::endl << std::flush;
+      return int_rand;
+    }
+
+    double rand_uniform(double min_value, double max_value) {
+      auto lDist = ::std::uniform_real_distribution<double>(min_value,max_value);
+      auto real_rand = lDist(mGenerator);
+      ::std::cout << "cReproducibleRandomNumberGenerator RAND_UNIFORM " << min_value << " " << max_value
+		  << " " << real_rand << std::endl << std::flush;
+      return real_rand;
+    }
+
+  
+    std::vector<double>
+    generate_double_sequence
+    (double min_value, double max_value, size_t iLength) {
+      ::std::vector<double> result(iLength);
+      for(size_t i=0; i < iLength; ++i) {
+	result[i] = rand_uniform(min_value, max_value);
+      }
+      return result;
+    }
+  
+  
+    std::vector<size_t>
+    generate_int_sequence
+    (size_t min_value, size_t max_value, size_t iLength) {
+      ::std::vector<size_t> result(iLength);
+      for(size_t i=0; i < iLength; ++i) {
+	result[i] = rand_int(min_value, max_value);
+      }
+      return result;
+    }
+  
+  };
+
+
+  template <typename T>
+  std::string to_string(const T a_value)
+  {
+    std::ostringstream out;
+    out.precision(15);
+    out << std::fixed << a_value;
+    return std::move(out).str();
+  }
+
+
+  template <class T>
+  ::std::string
+  array_to_string(T const * iArray, size_t dim)
+  {
+    if(!iArray) {
+      return "[ ]";
+    }
+    if(dim == 0) {
+      return "[ ]";
+    }
+    ::std::string info = "[ " + to_string(iArray[0]);
+    for (size_t i = 1; i < dim; i++) {
+      info = info + ", " + to_string(iArray[i]);
+    }
+    info = info + " ]";
+    return info; 
+  }
+
+  void dump_svm_parameter(const struct svm_parameter *param) {
+    ::std::cout << "SVM_PARAMETER::DUMP START" << std::endl;
+    ::std::cout << "SVM_PARAMETER (svm_type, kernel_type) " << param->svm_type << " " << param->kernel_type << std::endl;
+    ::std::cout << "SVM_PARAMETER (degree, gamma, coef0) " << param->degree << " " << param->gamma << " " << param->coef0 <<  std::endl;
+    ::std::cout << "SVM_PARAMETER (cache_size, eps, C) " << param->cache_size << " " << param->eps << " " << param->C << std::endl;
+    ::std::cout << "SVM_PARAMETER (nr_weight, weight_label, weight) " << param->nr_weight << " "
+		<< array_to_string(param->weight_label, 2) << " " << array_to_string(param->weight, 2) 
+		<< std::endl;
+    ::std::cout << "SVM_PARAMETER (nu, p) " << param->nu << " " << param->p << std::endl;
+    ::std::cout << "SVM_PARAMETER (shrinking, probability) " << param->shrinking << " " << param->probability << std::endl;
+    ::std::cout << "SVM_PARAMETER (max_iter, random_seed) " << param->max_iter << " " << param->random_seed << std::endl;
+    ::std::cout << "SVM_PARAMETER::DUMP END" << std::endl;
+    ::std::cout << std::flush;
+  }
+
+  void dump_svm_problem(const struct svm_problem *prob) {
+    ::std::cout << "SVM_PROBLEM::DUMP START" << std::endl;
+  
+    ::std::cout << "SVM_PROBLEM_L " << prob->l << std::endl;
+    for(size_t i=0; i<std::min(prob->l, 5); i++) {
+      ::std::cout << "SVM_PRBLEM_IDX_X_Y " << i << array_to_string(prob->x[i].values, prob->x[i].dim)
+		  << " " << prob->y[i] << std::endl << std::flush;
+    }
+    ::std::cout << "SVM_PROBLEM::DUMP END" << std::endl;
+    ::std::cout << std::flush;
+  }
+
+  void dump_svm_model(const struct svm_model *model) {
+    ::std::cout << "SVM_MODEL::DUMP START" << std::endl;
+  
+    ::std::cout << "SVM_MODEL_CLASSES " << model->nr_class << std::endl;
+    ::std::cout << "SVM_MODEL_L " << model->l << std::endl;
+    for(size_t i=0; i < model->l; i++) {
+      ::std::cout << "SVM_MODEL_SV " << i << " " << array_to_string(model->SV[i].values, model->l)
+		  << std::endl << std::flush;
+    }
+    for(size_t i=0; i < 1; i++) {
+      ::std::cout << "SVM_MODEL_SV_COEFF " << i << " " << array_to_string(model->sv_coef[i], model->l)
+		  << std::endl << std::flush;
+    }
+    ::std::cout << "SVM_MODEL_N_ITER " << array_to_string(model->n_iter, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "SVM_MODEL_RHO " << array_to_string(model->rho, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "SVM_MODEL_PROB_A " << array_to_string(model->probA, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "SVM_MODEL_PROB_B " << array_to_string(model->probB, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "SVM_MODEL_LABEL " << array_to_string(model->label, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "SVM_MODEL_N_SV " << array_to_string(model->nSV, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "SVM_MODEL::DUMP END" << std::endl;
+    ::std::cout << std::flush;
+  }
+
+  class cTimer {
+    ::std::string mMessage;
+    ::std::time_t mStart;
+  
+  public:
+    cTimer(::std::string const & iMessage) : mMessage(iMessage){
+      auto const now = ::std::chrono::system_clock::now();
+      mStart = ::std::chrono::system_clock::to_time_t(now);
+      ::std::string time_str = ::std::ctime(&mStart);
+      time_str.pop_back();
+      ::std::cout << "TIMED_OPERATION_START '" << mMessage << "'\n" << ::std::flush;
+      // assert(0);
+    }
+
+    void print_elapsed() const {
+      auto const now = ::std::chrono::system_clock::now();
+      auto lEnd = ::std::chrono::system_clock::to_time_t(now);
+      auto lElapsed = lEnd - mStart;
+      ::std::cout << "TIMED_OPERATION_END_ELAPSED_SECONDS '" << mMessage << "' " << lElapsed << "\n" << ::std::flush;
+    }
+  
+    virtual ~cTimer() {
+      print_elapsed();
+    }
+  
+  };
+
+} // eof anonymous namepace
+
+#endif // HAS_REPRODUCIBLE_RAND 1  
 
 
 #ifndef _LIBSVM_CPP
@@ -345,7 +525,8 @@ private:
 	}
 	double kernel_rbf(int i, int j) const
 	{
-		return exp(-gamma*(x_square[i]+x_square[j]-2*dot(x[i],x[j],m_blas)));
+	  double out = exp(-gamma*(x_square[i]+x_square[j]-2*dot(x[i],x[j],m_blas)));
+	  return out;
 	}
 	double kernel_sigmoid(int i, int j) const
 	{
@@ -452,7 +633,7 @@ double Kernel::dot(const PREFIX(node) *px, const PREFIX(node) *py, BlasFunctions
 double Kernel::k_function(const PREFIX(node) *x, const PREFIX(node) *y,
 			  const svm_parameter& param, BlasFunctions *blas_functions)
 {
-	switch(param.kernel_type)
+  switch(param.kernel_type)
 	{
 		case LINEAR:
 			return dot(x,y,blas_functions);
@@ -627,6 +808,7 @@ void Solver::reconstruct_gradient()
 	int i,j;
 	int nr_free = 0;
 
+	
 	for(j=active_size;j<l;j++)
 		G[j] = G_bar[j] + p[j];
 
@@ -658,6 +840,7 @@ void Solver::reconstruct_gradient()
 					G[j] += alpha_i * Q_i[j];
 			}
 	}
+
 }
 
 void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
@@ -678,15 +861,17 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 	// initialize alpha_status
 	{
 		alpha_status = new char[l];
-		for(int i=0;i<l;i++)
+		for(int i=0;i<l;i++) {
 			update_alpha_status(i);
+		}
 	}
 
 	// initialize active set (for shrinking)
 	{
 		active_set = new int[l];
-		for(int i=0;i<l;i++)
-			active_set[i] = i;
+		for(int i=0;i<l;i++) {
+		  active_set[i] = i;
+		}
 		active_size = l;
 	}
 
@@ -712,9 +897,11 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 					for(j=0;j<l;j++)
 						G_bar[j] += get_C(i) * Q_i[j];
 			}
+		
 	}
 
 	// optimization step
+
 
 	int iter = 0;
 	int counter = min(l,1000)+1;
@@ -974,6 +1161,7 @@ int Solver::select_working_set(int &out_i, int &out_j)
 				}
 		}
 
+	
 	int i = Gmax_idx;
 	const Qfloat *Q_i = NULL;
 	if(i != -1) // NULL Q_i not accessed: Gmax=-INF if i=-1
@@ -1442,6 +1630,7 @@ public:
 			for(j=start;j<len;j++)
 				data[j] = (Qfloat)(y[i]*y[j]*(this->*kernel_function)(i,j));
 		}
+		
 		return data;
 	}
 
@@ -2113,11 +2302,14 @@ static void svm_binary_svc_probability(
 	int *perm = Malloc(int,prob->l);
 	double *dec_values = Malloc(double,prob->l);
 
+	cReproducibleRandomNumberGenerator lGen;
+	lGen.set_seed(param->random_seed);
+	
 	// random shuffle
 	for(i=0;i<prob->l;i++) perm[i]=i;
 	for(i=0;i<prob->l;i++)
 	{
-		int j = i+bounded_rand_int(prob->l-i);
+		int j = i + lGen.rand_int(0, prob->l-i);
 		swap(perm[i],perm[j]);
 	}
 	for(i=0;i<nr_fold;i++)
@@ -2213,8 +2405,6 @@ static double svm_svr_probability(
 
 	svm_parameter newparam = *param;
 	newparam.probability = 0;
-    newparam.random_seed = -1; // This is called from train, which already sets
-                               // the seed.
 	PREFIX(cross_validation)(prob,&newparam,nr_fold,ymv, blas_functions);
 	for(i=0;i<prob->l;i++)
 	{
@@ -2315,13 +2505,16 @@ static void svm_group_classes(const PREFIX(problem) *prob, int *nr_class_ret, in
 	}
 
 	start[0] = 0;
-	for(i=1;i<nr_class;i++)
+	for(i=1;i<nr_class;i++) {
 		start[i] = start[i-1]+count[i-1];
+	}
 
+	
 	*nr_class_ret = nr_class;
 	*label_ret = label;
 	*start_ret = start;
 	*count_ret = count;
+
 	free(data_label);
 }
 
@@ -2370,10 +2563,11 @@ PREFIX(model) *PREFIX(train)(const PREFIX(problem) *prob, const svm_parameter *p
 	model->param = *param;
 	model->free_sv = 0;	// XXX
 
-    if(param->random_seed >= 0)
-    {
-        set_seed(param->random_seed);
-    }
+#ifdef _DENSE_REP
+	// dump_svm_problem(prob);
+	// dump_svm_parameter(param);
+#endif
+	
 
 	if(param->svm_type == ONE_CLASS ||
 	   param->svm_type == EPSILON_SVR ||
@@ -2645,6 +2839,10 @@ PREFIX(model) *PREFIX(train)(const PREFIX(problem) *prob, const svm_parameter *p
 	free(newprob.x);
 	free(newprob.y);
 	free(newprob.W);
+
+#ifdef _DENSE_REP
+	// dump_svm_model(model);
+#endif
 	return model;
 }
 
@@ -2656,10 +2854,9 @@ void PREFIX(cross_validation)(const PREFIX(problem) *prob, const svm_parameter *
 	int l = prob->l;
 	int *perm = Malloc(int,l);
 	int nr_class;
-    if(param->random_seed >= 0)
-    {
-        set_seed(param->random_seed);
-    }
+
+	cReproducibleRandomNumberGenerator lGen;
+	lGen.set_seed(param->random_seed);
 
 	// stratified cv may not give leave-one-out rate
 	// Each class to l folds -> some folds may have zero elements
@@ -2680,7 +2877,7 @@ void PREFIX(cross_validation)(const PREFIX(problem) *prob, const svm_parameter *
 		for (c=0; c<nr_class; c++)
 			for(i=0;i<count[c];i++)
 			{
-				int j = i+bounded_rand_int(count[c]-i);
+				int j = i + lGen.rand_int(0, count[c]-i);
 				swap(index[start[c]+j],index[start[c]+i]);
 			}
 		for(i=0;i<nr_fold;i++)
@@ -2717,7 +2914,7 @@ void PREFIX(cross_validation)(const PREFIX(problem) *prob, const svm_parameter *
 		for(i=0;i<l;i++) perm[i]=i;
 		for(i=0;i<l;i++)
 		{
-			int j = i+bounded_rand_int(l-i);
+			int j = i + lGen.rand_int(0, l-i);
 			swap(perm[i],perm[j]);
 		}
 		for(i=0;i<=nr_fold;i++)
