@@ -12,6 +12,7 @@
 #
 # License: BSD 3 clause
 
+from libc.stdio cimport printf, fflush
 from libc.string cimport memcpy
 from libc.string cimport memset
 from libc.math cimport fabs, INFINITY
@@ -181,6 +182,8 @@ cdef class Criterion:
         cdef double impurity_left
         cdef double impurity_right
         self.children_impurity(&impurity_left, &impurity_right)
+        improvement = - self.weighted_n_right * impurity_right - self.weighted_n_left * impurity_left
+        printf("CRITERION::PROXY_IMPURITY_IMPROVEMENT %g %g %g %g %g\n", impurity_left, impurity_right, self.weighted_n_left, self.weighted_n_right, improvement)
 
         return (- self.weighted_n_right * impurity_right
                 - self.weighted_n_left * impurity_left)
@@ -389,6 +392,8 @@ cdef class ClassificationCriterion(Criterion):
         self.weighted_n_samples = weighted_n_samples
         self.weighted_n_node_samples = 0.0
 
+        printf("CLASS_CRITERION_INIT_START y_size=%d start=%d end=%d\n", y.shape[0], start, end)
+        
         cdef SIZE_t i
         cdef SIZE_t p
         cdef SIZE_t k
@@ -415,6 +420,13 @@ cdef class ClassificationCriterion(Criterion):
 
         # Reset to pos=start
         self.reset()
+        printf("CLASS_CRITERION_INIT_END y_size=%d start=%d end=%d self_weighted_n_node_samples=%d",
+               y.shape[0], start, end, self.weighted_n_node_samples)
+        printf(" sum_total=[ ");
+        for c in range(self.n_classes[0]):
+                printf("%g ", self.sum_total[0, c])
+        printf("]\n")
+
         return 0
 
     cdef void init_sum_missing(self):
@@ -456,6 +468,9 @@ cdef class ClassificationCriterion(Criterion):
         Returns -1 in case of failure to allocate memory (and raise MemoryError)
         or 0 otherwise.
         """
+        printf("CLASS_CRITERION_RESET %d %d %d\n", self.start, self.end, self.pos)
+        
+	
         self.pos = self.start
         _move_sums_classification(
             self,
@@ -502,6 +517,8 @@ cdef class ClassificationCriterion(Criterion):
         # self.sample_indices[end_non_missing:self.end].
         cdef SIZE_t end_non_missing = self.end - self.n_missing
 
+        printf("CLASS_CRITERION UPDATE_START %d %d %d %d %d\n", pos, new_pos, self.end, self.n_missing, end_non_missing)
+	      
         cdef const SIZE_t[:] sample_indices = self.sample_indices
         cdef const DOUBLE_t[:] sample_weight = self.sample_weight
 
@@ -527,7 +544,9 @@ cdef class ClassificationCriterion(Criterion):
 
                 for k in range(self.n_outputs):
                     self.sum_left[k, <SIZE_t> self.y[i, k]] += w
-
+                    printf("CLASS_CRITERION UPDATE_ADD_SAMPLE %d %d %g %d\n", p, i, w, <SIZE_t> self.y[i, k])
+                    
+		
                 self.weighted_n_left += w
 
         else:
@@ -541,6 +560,7 @@ cdef class ClassificationCriterion(Criterion):
 
                 for k in range(self.n_outputs):
                     self.sum_left[k, <SIZE_t> self.y[i, k]] -= w
+                    printf("CLASS_CRITERION UPDATE_ADD_SAMPLE %d %d %g %d\n", p, i, w, <SIZE_t> self.y[i, k])
 
                 self.weighted_n_left -= w
 
@@ -549,8 +569,12 @@ cdef class ClassificationCriterion(Criterion):
         for k in range(self.n_outputs):
             for c in range(self.n_classes[k]):
                 self.sum_right[k, c] = self.sum_total[k, c] - self.sum_left[k, c]
+                printf("CLASS_CRITERION UPDATE_SUM_CLASS_TOTAL_RIGHT_LEFT %d %d %d %g %g %g\n", pos, new_pos, c, self.sum_total[k, c],  self.sum_right[k, c], self.sum_left[k, c])
+                
 
         self.pos = new_pos
+        printf("CLASS_CRITERION UPDATE_END %d %d %d %d %d\n", pos, new_pos, self.end, self.n_missing, end_non_missing)
+        
         return 0
 
     cdef double node_impurity(self) noexcept nogil:

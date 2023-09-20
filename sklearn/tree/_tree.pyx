@@ -14,6 +14,7 @@
 
 from cpython cimport Py_INCREF, PyObject, PyTypeObject
 
+from libc.stdio cimport printf, fflush
 from libc.stdlib cimport free
 from libc.string cimport memcpy
 from libc.string cimport memset
@@ -922,6 +923,9 @@ cdef class Tree:
         Returns (size_t)(-1) on error.
         """
         cdef SIZE_t node_id = self.node_count
+
+        printf("TREE_ADD_NODE %d %d %g %g %d %g %d\n", node_id, feature, threshold, impurity, n_node_samples, weighted_n_node_samples, missing_go_to_left)
+        
 
         if node_id >= self.capacity:
             if self._resize_c() != 0:
