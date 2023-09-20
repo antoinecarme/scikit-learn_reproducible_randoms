@@ -924,7 +924,7 @@ cdef class Tree:
         """
         cdef SIZE_t node_id = self.node_count
 
-        printf("TREE_ADD_NODE %d %d %g %g %d %g %d\n", node_id, feature, threshold, impurity, n_node_samples, weighted_n_node_samples, missing_go_to_left)
+        printf("MLLITE_DBG_TREE_ADD_NODE %d %d %g %g %d %g %d\n", node_id, feature, threshold, impurity, n_node_samples, weighted_n_node_samples, missing_go_to_left)
         
 
         if node_id >= self.capacity:

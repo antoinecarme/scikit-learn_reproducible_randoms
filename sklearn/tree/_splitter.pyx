@@ -229,7 +229,7 @@ cdef class Splitter:
         )
 
         weighted_n_node_samples[0] = self.criterion.weighted_n_node_samples
-        printf("SPLITTER_AFTER_NODE_RESET %d %d %g\n", start, end, weighted_n_node_samples[0])
+        printf("MLLITE_DBG_SPLITTER_AFTER_NODE_RESET %d %d %g\n", start, end, weighted_n_node_samples[0])
         return 0
 
     cdef int node_split(
@@ -388,7 +388,7 @@ cdef inline int node_split_best(
         # Draw a feature at random
         f_j = lGen.rand_int(n_drawn_constants, f_i - n_found_constants)
 
-        printf("SPLITTER_BEST_DRAW_FEATURE n_drawn_constants=%d f_i=%d n_found_constants=%d (f_i - n_found_constants)=%d f_j=%d self_n_features=%d n_known_constants=%d\n", n_drawn_constants, f_i, n_found_constants, f_i - n_found_constants, f_j, splitter.n_features, n_known_constants);
+        printf("MLLITE_DBG_SPLITTER_BEST_DRAW_FEATURE n_drawn_constants=%d f_i=%d n_found_constants=%d (f_i - n_found_constants)=%d f_j=%d self_n_features=%d n_known_constants=%d\n", n_drawn_constants, f_i, n_found_constants, f_i - n_found_constants, f_j, splitter.n_features, n_known_constants);
         
 
         if f_j < n_known_constants:
@@ -400,7 +400,7 @@ cdef inline int node_split_best(
 
         # f_j in the interval [n_known_constants, f_i - n_found_constants[
         f_j += n_found_constants
-        printf("SPLITTER_BEST_DRAW_FEATURE_2 n_drawn_constants=%d f_i=%d n_found_constants=%d (f_i - n_found_constants)=%d f_j=%d self_n_features=%d n_known_constants=%d\n", n_drawn_constants, f_i, n_found_constants, f_i - n_found_constants, f_j, splitter.n_features, n_known_constants)
+        printf("MLLITE_DBG_SPLITTER_BEST_DRAW_FEATURE_2 n_drawn_constants=%d f_i=%d n_found_constants=%d (f_i - n_found_constants)=%d f_j=%d self_n_features=%d n_known_constants=%d\n", n_drawn_constants, f_i, n_found_constants, f_i - n_found_constants, f_j, splitter.n_features, n_known_constants)
         
 
 
@@ -409,7 +409,7 @@ cdef inline int node_split_best(
         partitioner.sort_samples_and_feature_values(current_split.feature)
         n_missing = partitioner.n_missing
         end_non_missing = end - n_missing
-        printf("SPLITTER_BEST_CURRENT_SPLIT_START %d %d %d %d %d %g %g %g\n",
+        printf("MLLITE_DBG_SPLITTER_BEST_CURRENT_SPLIT_START %d %d %d %d %d %g %g %g\n",
                f_j, features[f_j], start, end, end_non_missing,
                feature_values[start], FEATURE_THRESHOLD, feature_values[end_non_missing - 1])
         
@@ -466,11 +466,11 @@ cdef inline int node_split_best(
                 if n_left < min_samples_leaf or n_right < min_samples_leaf:
                     continue
 
-                printf("SPLITTER_BEST_CURRENT_SPLIT_POS %d %d %d\n", f_j, features[f_j], p)
+                printf("MLLITE_DBG_SPLITTER_BEST_CURRENT_SPLIT_POS %d %d %d\n", f_j, features[f_j], p)
                 
                 current_split.pos = p
                 criterion.update(current_split.pos)
-                printf("SPLITTER_CRITERION_AFTER_UPDATE_WEIGHT_LEFT_RIGHT %d %d %g %g\n",
+                printf("MLLITE_DBG_SPLITTER_CRITERION_AFTER_UPDATE_WEIGHT_LEFT_RIGHT %d %d %g %g\n",
                        f_j, features[f_j], criterion.weighted_n_left, criterion.weighted_n_right)
                 
 
@@ -904,8 +904,8 @@ cdef class DensePartitioner:
         DTYPE_t[::1] feature_values,
         const unsigned char[::1] missing_values_in_feature_mask,
     ):
-        printf("DENSE_PARTITIONER::DENSE_PARTITIONER()\n")
-        printf("DENSE_PARTITIONER::INIT %d\n", X.shape[0]); 
+        printf("MLLITE_DBG_DENSE_PARTITIONER::DENSE_PARTITIONER()\n")
+        printf("MLLITE_DBG_DENSE_PARTITIONER::INIT %d\n", X.shape[0]); 
         self.X = X
         self.samples = samples
         self.feature_values = feature_values
@@ -913,7 +913,7 @@ cdef class DensePartitioner:
 
     cdef inline void init_node_split(self, SIZE_t start, SIZE_t end) noexcept nogil:
         """Initialize splitter at the beginning of node_split."""
-        printf("DENSE_PARTITIONER::INIT_NODE_SPLIT %d %d\n", start, end); 
+        printf("MLLITE_DBG_DENSE_PARTITIONER::INIT_NODE_SPLIT %d %d\n", start, end); 
         self.start = start
         self.end = end
         self.n_missing = 0
@@ -937,7 +937,7 @@ cdef class DensePartitioner:
 
 
 
-        printf("DENSE_PARTITIONER SORT_SAMPLES_AND_FEATURE_VALUES %d %d %d\n", current_feature, self.start, self.end)
+        printf("MLLITE_DBG_DENSE_PARTITIONER SORT_SAMPLES_AND_FEATURE_VALUES %d %d %d\n", current_feature, self.start, self.end)
         
         # Sort samples along that feature; by
         # copying the values into an array and
@@ -1011,14 +1011,14 @@ cdef class DensePartitioner:
             SIZE_t end_non_missing = self.end - self.n_missing
 
 
-        printf("DENSE_PARTITIONER NEXT_P_START %d %d %d %d %d\n", p_prev[0], p[0], self.end, self.n_missing, end_non_missing) 
+        printf("MLLITE_DBG_DENSE_PARTITIONER NEXT_P_START %d %d %d %d %d\n", p_prev[0], p[0], self.end, self.n_missing, end_non_missing) 
 
 
         while (
             p[0] + 1 < end_non_missing and
             feature_values[p[0] + 1] <= feature_values[p[0]] + FEATURE_THRESHOLD
         ):
-            printf("DENSE_PARTITIONER NEXT_P_DETAIL %d %g %g %g\n", p[0],
+            printf("MLLITE_DBG_DENSE_PARTITIONER NEXT_P_DETAIL %d %g %g %g\n", p[0],
                    feature_values[p[0] + 1], feature_values[p[0]], FEATURE_THRESHOLD)
             p[0] += 1
 
@@ -1028,7 +1028,7 @@ cdef class DensePartitioner:
         # By adding 1, we have
         # (feature_values[p] >= end) or (feature_values[p] > feature_values[p - 1])
         p[0] += 1
-        printf("DENSE_PARTITIONER NEXT_P_END %d %d %d %d %d\n", p_prev[0], p[0], self.end, self.n_missing, end_non_missing) 
+        printf("MLLITE_DBG_DENSE_PARTITIONER NEXT_P_END %d %d %d %d %d\n", p_prev[0], p[0], self.end, self.n_missing, end_non_missing) 
 
     cdef inline SIZE_t partition_samples(self, double current_threshold) noexcept nogil:
         """Partition samples for feature_values at the current_threshold."""
