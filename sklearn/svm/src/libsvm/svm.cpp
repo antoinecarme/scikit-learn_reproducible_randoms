@@ -65,6 +65,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <cassert>
 #include <float.h>
 #include <string.h>
 #include <stdarg.h>
@@ -149,11 +150,24 @@ namespace {
   std::string to_string(const T a_value)
   {
     std::ostringstream out;
-    out.precision(15);
-    out << std::fixed << a_value;
+    // out.precision(15);
+    out << +a_value;
     return std::move(out).str();
   }
 
+  std::vector<size_t>
+  get_first_and_last_indices_to_display(size_t N, size_t P = 12) {
+    std::vector<size_t> lIndices;
+    lIndices.reserve(P);
+    if(N <= P) {
+      for(size_t i=0; i< N; i++) lIndices.push_back(i); 	
+    } else {
+      for(size_t i=0; i< (P/2); i++) lIndices.push_back(i); 	
+      for(size_t i=0; i< (P/2); i++) lIndices.push_back(N - P/2 + i); 	
+    }
+    return lIndices;
+  }
+  
 
   template <class T>
   ::std::string
@@ -165,61 +179,77 @@ namespace {
     if(dim == 0) {
       return "[ ]";
     }
-    ::std::string info = "[ " + to_string(iArray[0]);
-    for (size_t i = 1; i < dim; i++) {
-      info = info + ", " + to_string(iArray[i]);
+    size_t P = 12;
+    auto lIndices = get_first_and_last_indices_to_display(dim, P);
+    ::std::string info = "[ " + to_string(iArray[ lIndices[0] ]);
+    for (size_t i = 1; i < lIndices.size(); i++) {
+      info = info + ", " + to_string(iArray[ lIndices[i] ]);
+      if((dim >= P) and (i == (P/2 - 1))) {
+	info = info + ", ... ";
+      }
     }
     info = info + " ]";
     return info; 
   }
+  
 
-  void dump_svm_parameter(const struct svm_parameter *param) {
-    ::std::cout << "SVM_PARAMETER::DUMP START" << std::endl;
-    ::std::cout << "SVM_PARAMETER (svm_type, kernel_type) " << param->svm_type << " " << param->kernel_type << std::endl;
-    ::std::cout << "SVM_PARAMETER (degree, gamma, coef0) " << param->degree << " " << param->gamma << " " << param->coef0 <<  std::endl;
-    ::std::cout << "SVM_PARAMETER (cache_size, eps, C) " << param->cache_size << " " << param->eps << " " << param->C << std::endl;
-    ::std::cout << "SVM_PARAMETER (nr_weight, weight_label, weight) " << param->nr_weight << " "
+  void dump_svm_parameter(const svm_parameter *param) {
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER::DUMP START" << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (svm_type, kernel_type) " << param->svm_type << " " << param->kernel_type << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (degree, gamma, coef0) " << param->degree << " " << param->gamma << " " << param->coef0 <<  std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (cache_size, eps, C) " << param->cache_size << " " << param->eps << " " << param->C << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (nr_weight, weight_label, weight) " << param->nr_weight << " "
 		<< array_to_string(param->weight_label, 2) << " " << array_to_string(param->weight, 2) 
 		<< std::endl;
-    ::std::cout << "SVM_PARAMETER (nu, p) " << param->nu << " " << param->p << std::endl;
-    ::std::cout << "SVM_PARAMETER (shrinking, probability) " << param->shrinking << " " << param->probability << std::endl;
-    ::std::cout << "SVM_PARAMETER (max_iter, random_seed) " << param->max_iter << " " << param->random_seed << std::endl;
-    ::std::cout << "SVM_PARAMETER::DUMP END" << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (nu, p) " << param->nu << " " << param->p << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (shrinking, probability) " << param->shrinking << " " << param->probability << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER (max_iter, random_seed) " << param->max_iter << " " << param->random_seed << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PARAMETER::DUMP END" << std::endl;
     ::std::cout << std::flush;
   }
 
-  void dump_svm_problem(const struct svm_problem *prob) {
-    ::std::cout << "SVM_PROBLEM::DUMP START" << std::endl;
+  void dump_svm_problem(const svm_problem *prob) {
+    ::std::cout << "MLLITE_DBG_SVM_PROBLEM::DUMP START" << std::endl;
   
-    ::std::cout << "SVM_PROBLEM_L " << prob->l << std::endl;
-    for(size_t i=0; i<std::min(prob->l, 5); i++) {
-      ::std::cout << "SVM_PRBLEM_IDX_X_Y " << i << array_to_string(prob->x[i].values, prob->x[i].dim)
+    ::std::cout << "MLLITE_DBG_SVM_PROBLEM_L " << prob->l << std::endl;
+    size_t P = 12;
+    auto lIndices = get_first_and_last_indices_to_display(prob->l, P);
+    for(size_t j=0; j< lIndices.size(); j++) {
+      auto i = lIndices[j];
+      ::std::cout << "MLLITE_DBG_SVM_PRBLEM_IDX_X_Y " << i << " " << array_to_string(prob->x[i].values, prob->x[i].dim)
 		  << " " << prob->y[i] << std::endl << std::flush;
     }
-    ::std::cout << "SVM_PROBLEM::DUMP END" << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_PROBLEM::DUMP END" << std::endl;
     ::std::cout << std::flush;
   }
 
-  void dump_svm_model(const struct svm_model *model) {
-    ::std::cout << "SVM_MODEL::DUMP START" << std::endl;
+  void dump_svm_model(const svm_model *model) {
+    ::std::cout << "MLLITE_DBG_SVM_MODEL::DUMP START" << std::endl;
   
-    ::std::cout << "SVM_MODEL_CLASSES " << model->nr_class << std::endl;
-    ::std::cout << "SVM_MODEL_L " << model->l << std::endl;
-    for(size_t i=0; i < model->l; i++) {
-      ::std::cout << "SVM_MODEL_SV " << i << " " << array_to_string(model->SV[i].values, model->l)
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_CLASSES " << model->nr_class << std::endl;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_L " << model->l << std::endl;
+    size_t P = 12;
+    auto lIndices = get_first_and_last_indices_to_display(model->l, P);
+    size_t dim = model->SV[0].dim;
+    for(size_t j=0; j< lIndices.size(); j++) {
+      auto i = lIndices[j];
+      ::std::cout << "MLLITE_DBG_SVM_MODEL_SV " << i << " " << array_to_string(model->SV[i].values, dim)
 		  << std::endl << std::flush;
     }
-    for(size_t i=0; i < 1; i++) {
-      ::std::cout << "SVM_MODEL_SV_COEFF " << i << " " << array_to_string(model->sv_coef[i], model->l)
+    auto lIndices2 = get_first_and_last_indices_to_display(model->nr_class - 1, P);
+    for(size_t j=0; j< lIndices2.size(); j++) {
+      auto i = lIndices2[j];    
+      ::std::cout << "MLLITE_DBG_SVM_MODEL_SV_COEFF " << i << " " << array_to_string(model->sv_coef[i], model->l)
 		  << std::endl << std::flush;
     }
-    ::std::cout << "SVM_MODEL_N_ITER " << array_to_string(model->n_iter, model->nr_class) << std::endl << std::flush;
-    ::std::cout << "SVM_MODEL_RHO " << array_to_string(model->rho, model->nr_class) << std::endl << std::flush;
-    ::std::cout << "SVM_MODEL_PROB_A " << array_to_string(model->probA, model->nr_class) << std::endl << std::flush;
-    ::std::cout << "SVM_MODEL_PROB_B " << array_to_string(model->probB, model->nr_class) << std::endl << std::flush;
-    ::std::cout << "SVM_MODEL_LABEL " << array_to_string(model->label, model->nr_class) << std::endl << std::flush;
-    ::std::cout << "SVM_MODEL_N_SV " << array_to_string(model->nSV, model->nr_class) << std::endl << std::flush;
-    ::std::cout << "SVM_MODEL::DUMP END" << std::endl;
+    size_t k = model->nr_class * (model->nr_class - 1) / 2; 
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_N_ITER " << array_to_string(model->n_iter, k) << std::endl << std::flush;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_RHO " << array_to_string(model->rho, k) << std::endl << std::flush;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_PROB_A " << array_to_string(model->probA, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_PROB_B " << array_to_string(model->probB, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_LABEL " << array_to_string(model->label, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL_N_SV " << array_to_string(model->nSV, model->nr_class) << std::endl << std::flush;
+    ::std::cout << "MLLITE_DBG_SVM_MODEL::DUMP END" << std::endl;
     ::std::cout << std::flush;
   }
 
@@ -233,7 +263,7 @@ namespace {
       mStart = ::std::chrono::system_clock::to_time_t(now);
       ::std::string time_str = ::std::ctime(&mStart);
       time_str.pop_back();
-      ::std::cout << "TIMED_OPERATION_START '" << mMessage << "'\n" << ::std::flush;
+      // ::std::cout << "TIMED_OPERATION_START '" << mMessage << "'\n" << ::std::flush;
       // assert(0);
     }
 
@@ -241,7 +271,7 @@ namespace {
       auto const now = ::std::chrono::system_clock::now();
       auto lEnd = ::std::chrono::system_clock::to_time_t(now);
       auto lElapsed = lEnd - mStart;
-      ::std::cout << "TIMED_OPERATION_END_ELAPSED_SECONDS '" << mMessage << "' " << lElapsed << "\n" << ::std::flush;
+      // ::std::cout << "TIMED_OPERATION_END_ELAPSED_SECONDS '" << mMessage << "' " << lElapsed << "\n" << ::std::flush;
     }
   
     virtual ~cTimer() {
@@ -366,6 +396,7 @@ private:
 
 Cache::Cache(int l_,long int size_):l(l_),size(size_)
 {
+  cTimer lTimer("Cache::Cache");
 	head = (head_t *)calloc(l,sizeof(head_t));	// initialized to 0
 	size /= sizeof(Qfloat);
 	size -= l * sizeof(head_t) / sizeof(Qfloat);
@@ -375,6 +406,7 @@ Cache::Cache(int l_,long int size_):l(l_),size(size_)
 
 Cache::~Cache()
 {
+  cTimer lTimer("Cache::~Cache");
 	for(head_t *h = lru_head.next; h != &lru_head; h=h->next)
 		free(h->data);
 	free(head);
@@ -550,6 +582,7 @@ Kernel::Kernel(int l, PREFIX(node) * const * x_, const svm_parameter& param, Bla
 :kernel_type(param.kernel_type), degree(param.degree),
  gamma(param.gamma), coef0(param.coef0)
 {
+  cTimer lTimer("Kernel::Kernel");
 	m_blas = blas_functions;
 	switch(kernel_type)
 	{
@@ -584,6 +617,7 @@ Kernel::Kernel(int l, PREFIX(node) * const * x_, const svm_parameter& param, Bla
 
 Kernel::~Kernel()
 {
+  cTimer lTimer("Kernel::~Kernel");
 	delete[] x;
 	delete[] x_square;
 }
@@ -609,6 +643,7 @@ double Kernel::dot(const PREFIX(node) &px, const PREFIX(node) &py, BlasFunctions
 #else
 double Kernel::dot(const PREFIX(node) *px, const PREFIX(node) *py, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("Kernel::dot");
 	double sum = 0;
 	while(px->index != -1 && py->index != -1)
 	{
@@ -788,6 +823,7 @@ private:
 
 void Solver::swap_index(int i, int j)
 {
+  cTimer lTimer("Solver::swap_index");
 	Q->swap_index(i,j);
 	swap(y[i],y[j]);
 	swap(G[i],G[j]);
@@ -801,10 +837,11 @@ void Solver::swap_index(int i, int j)
 
 void Solver::reconstruct_gradient()
 {
+  cTimer lTimer("Solver::reconstruct_gradient");
 	// reconstruct inactive elements of G from G_bar and free variables
 
 	if(active_size == l) return;
-
+	assert(0);
 	int i,j;
 	int nr_free = 0;
 
@@ -817,7 +854,7 @@ void Solver::reconstruct_gradient()
 			nr_free++;
 
 	if(2*nr_free < active_size)
-		info("\nWarning: using -h 0 may be faster\n");
+	  std::cout << "MLLITE_DBG_WARNING 'using -h 0 may be faster'\n";
 
 	if (nr_free*l > 2*active_size*(l-active_size))
 	{
@@ -858,6 +895,8 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 	unshrink = false;
         si->solve_timed_out = false;
 
+	std::cout << "MLLITE_DBG_SOLVER::SOLVE " << l << std::endl;
+	
 	// initialize alpha_status
 	{
 		alpha_status = new char[l];
@@ -901,18 +940,20 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 	}
 
 	// optimization step
-
+	::std::cout << "MLLITE_DBG_SOLVER::SOLVE OPTIMIZATION_STEP" << std::endl;
 
 	int iter = 0;
 	int counter = min(l,1000)+1;
 
 	while(1)
 	{
+	  ::std::cout << "MLLITE_DBG_SOLVER::SOLVE ITERATION_START (iter, counter) " << iter << " "
+		      << counter << std::endl;
                 // set max_iter to -1 to disable the mechanism
                 if ((max_iter != -1) && (iter >= max_iter)) {
-                    info("WARN: libsvm Solver reached max_iter");
-                    si->solve_timed_out = true;
-                    break;
+		  std::cout << "MLLITE_DBG_WARNING: 'libsvm Solver reached max_iter'";
+		  si->solve_timed_out = true;
+		  break;
                 }
 
 		// show progress and do shrinking
@@ -921,7 +962,6 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 		{
 			counter = min(l,1000);
 			if(shrinking) do_shrinking();
-			info(".");
 		}
 
 		int i,j;
@@ -931,7 +971,6 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 			reconstruct_gradient();
 			// reset active set size and check
 			active_size = l;
-			info("*");
 			if(select_working_set(i,j)!=0)
 				break;
 			else
@@ -944,17 +983,25 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 
 		const Qfloat *Q_i = Q.get_Q(i,active_size);
 		const Qfloat *Q_j = Q.get_Q(j,active_size);
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_Q_I " << i << " " << array_to_string(Q_i, active_size) << std::endl << std::flush;
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_Q_J " << j << " " << array_to_string(Q_j, active_size) << std::endl << std::flush;
 
 		double C_i = get_C(i);
 		double C_j = get_C(j);
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_CI_CJ " << i << " " << j << " " << C_i << " " << C_j
+			    << std::endl << std::flush;
 
 		double old_alpha_i = alpha[i];
 		double old_alpha_j = alpha[j];
+		
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_OLD_ALPHAI_ALPHAJ " << i << " " << j << " "
+			    << alpha[i] << " " << alpha[j]
+			    << std::endl << std::flush;
 
 		if(y[i]!=y[j])
 		{
 			double quad_coef = QD[i]+QD[j]+2*Q_i[j];
-			if (quad_coef <= 0)
+			if (quad_coef <= TAU)
 				quad_coef = TAU;
 			double delta = (-G[i]-G[j])/quad_coef;
 			double diff = alpha[i] - alpha[j];
@@ -997,7 +1044,7 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 		else
 		{
 			double quad_coef = QD[i]+QD[j]-2*Q_i[j];
-			if (quad_coef <= 0)
+			if (quad_coef <= TAU)
 				quad_coef = TAU;
 			double delta = (G[i]-G[j])/quad_coef;
 			double sum = alpha[i] + alpha[j];
@@ -1038,15 +1085,24 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 			}
 		}
 
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_NEW_ALPHAI_ALPHAJ " << i << " " << j << " "
+			    << alpha[i] << " " << alpha[j]
+			    << std::endl << std::flush;
+		
 		// update G
 
 		double delta_alpha_i = alpha[i] - old_alpha_i;
 		double delta_alpha_j = alpha[j] - old_alpha_j;
 
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_DELTA_ALPHAI_ALPHAJ " << i << " " << j << " "
+			    << delta_alpha_i << " " << delta_alpha_j
+			    << std::endl << std::flush;
+		
 		for(int k=0;k<active_size;k++)
 		{
 			G[k] += Q_i[k]*delta_alpha_i + Q_j[k]*delta_alpha_j;
 		}
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_G " << array_to_string(G, active_size) << std::endl << std::flush;
 
 		// update alpha_status and G_bar
 
@@ -1078,6 +1134,7 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 						G_bar[k] += C_j * Q_j[k];
 			}
 		}
+		::std::cout << "MLLITE_DBG_SOLVER::SOLVE_G_BAR " << array_to_string(G_bar, active_size) << std::endl << std::flush;
 	}
 
 	// calculate rho
@@ -1114,8 +1171,8 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 	// store number of iterations
 	si->n_iter = iter;
 
-	info("\noptimization finished, #iter = %d\n",iter);
-
+	std::cout << "MLLITE_DBG_OPTIMIZATION FINISHED, #iter = " << iter << "\n" << std::flush;
+ 
 	delete[] p;
 	delete[] y;
 	delete[] alpha;
@@ -1129,6 +1186,7 @@ void Solver::Solve(int l, const QMatrix& Q, const double *p_, const schar *y_,
 // return 1 if already optimal, return 0 otherwise
 int Solver::select_working_set(int &out_i, int &out_j)
 {
+  cTimer lTimer("Solver::select_working_set");
 	// return i,j such that
 	// i: maximizes -y_i * grad(f)_i, i in I_up(\alpha)
 	// j: minimizes the decrease of obj value
@@ -1180,7 +1238,7 @@ int Solver::select_working_set(int &out_i, int &out_j)
 				{
 					double obj_diff;
 					double quad_coef = QD[i]+QD[j]-2.0*y[i]*Q_i[j];
-					if (quad_coef > 0)
+					if (quad_coef > TAU)
 						obj_diff = -(grad_diff*grad_diff)/quad_coef;
 					else
 						obj_diff = -(grad_diff*grad_diff)/TAU;
@@ -1204,7 +1262,7 @@ int Solver::select_working_set(int &out_i, int &out_j)
 				{
 					double obj_diff;
 					double quad_coef = QD[i]+QD[j]+2.0*y[i]*Q_i[j];
-					if (quad_coef > 0)
+					if (quad_coef > TAU)
 						obj_diff = -(grad_diff*grad_diff)/quad_coef;
 					else
 						obj_diff = -(grad_diff*grad_diff)/TAU;
@@ -1222,6 +1280,11 @@ int Solver::select_working_set(int &out_i, int &out_j)
 	if(Gmax+Gmax2 < eps || Gmin_idx == -1)
 		return 1;
 
+	::std::cout << "MLLITE_DBG_SOLVER::SELECT_WORKING_SET (i,j) = (" << Gmax_idx << " , " <<  Gmin_idx << ") "
+		    << "active_size=" << active_size
+		    << " Gmax = " << Gmax  << " Gmax2 = " << Gmax2  << " obj_min=" << obj_diff_min
+		    << std::endl << std::flush;
+
 	out_i = Gmax_idx;
 	out_j = Gmin_idx;
 	return 0;
@@ -1229,6 +1292,7 @@ int Solver::select_working_set(int &out_i, int &out_j)
 
 bool Solver::be_shrunk(int i, double Gmax1, double Gmax2)
 {
+  cTimer lTimer("Solver::be_shrunk");
 	if(is_upper_bound(i))
 	{
 		if(y[i]==+1)
@@ -1249,6 +1313,7 @@ bool Solver::be_shrunk(int i, double Gmax1, double Gmax2)
 
 void Solver::do_shrinking()
 {
+  cTimer lTimer("Solver::do_shrinking");
 	int i;
 	double Gmax1 = -INF;		// max { -y_i * grad(f)_i | i in I_up(\alpha) }
 	double Gmax2 = -INF;		// max { y_i * grad(f)_i | i in I_low(\alpha) }
@@ -1289,7 +1354,6 @@ void Solver::do_shrinking()
 		unshrink = true;
 		reconstruct_gradient();
 		active_size = l;
-		info("*");
 	}
 
 	for(i=0;i<active_size;i++)
@@ -1310,6 +1374,7 @@ void Solver::do_shrinking()
 
 double Solver::calculate_rho()
 {
+  cTimer lTimer("Solver::calculate_rho");
 	double r;
 	int nr_free = 0;
 	double ub = INF, lb = -INF, sum_free = 0;
@@ -1373,6 +1438,7 @@ private:
 // return 1 if already optimal, return 0 otherwise
 int Solver_NU::select_working_set(int &out_i, int &out_j)
 {
+  cTimer lTimer("Solver_NU::select_working_set");
 	// return i,j such that y_i = y_j and
 	// i: maximizes -y_i * grad(f)_i, i in I_up(\alpha)
 	// j: minimizes the decrease of obj value
@@ -1432,7 +1498,7 @@ int Solver_NU::select_working_set(int &out_i, int &out_j)
 				{
 					double obj_diff;
 					double quad_coef = QD[ip]+QD[j]-2*Q_ip[j];
-					if (quad_coef > 0)
+					if (quad_coef > TAU)
 						obj_diff = -(grad_diff*grad_diff)/quad_coef;
 					else
 						obj_diff = -(grad_diff*grad_diff)/TAU;
@@ -1456,7 +1522,7 @@ int Solver_NU::select_working_set(int &out_i, int &out_j)
 				{
 					double obj_diff;
 					double quad_coef = QD[in]+QD[j]-2*Q_in[j];
-					if (quad_coef > 0)
+					if (quad_coef > TAU)
 						obj_diff = -(grad_diff*grad_diff)/quad_coef;
 					else
 						obj_diff = -(grad_diff*grad_diff)/TAU;
@@ -1485,6 +1551,7 @@ int Solver_NU::select_working_set(int &out_i, int &out_j)
 
 bool Solver_NU::be_shrunk(int i, double Gmax1, double Gmax2, double Gmax3, double Gmax4)
 {
+  cTimer lTimer("Solver_NU::be_shrunk");
 	if(is_upper_bound(i))
 	{
 		if(y[i]==+1)
@@ -1505,6 +1572,7 @@ bool Solver_NU::be_shrunk(int i, double Gmax1, double Gmax2, double Gmax3, doubl
 
 void Solver_NU::do_shrinking()
 {
+  cTimer lTimer("Solver_NU::do_shrinking");
 	double Gmax1 = -INF;	// max { -y_i * grad(f)_i | y_i = +1, i in I_up(\alpha) }
 	double Gmax2 = -INF;	// max { y_i * grad(f)_i | y_i = +1, i in I_low(\alpha) }
 	double Gmax3 = -INF;	// max { -y_i * grad(f)_i | y_i = -1, i in I_up(\alpha) }
@@ -1557,6 +1625,7 @@ void Solver_NU::do_shrinking()
 
 double Solver_NU::calculate_rho()
 {
+  cTimer lTimer("Solver_NU::calculate_rho");
 	int nr_free1 = 0,nr_free2 = 0;
 	double ub1 = INF, ub2 = INF;
 	double lb1 = -INF, lb2 = -INF;
@@ -1614,6 +1683,7 @@ public:
 	SVC_Q(const PREFIX(problem)& prob, const svm_parameter& param, const schar *y_, BlasFunctions *blas_functions)
 	:Kernel(prob.l, prob.x, param, blas_functions)
 	{
+	  cTimer lTimer("SVC_Q::SVC_Q");
 		clone(y,y_,prob.l);
 		cache = new Cache(prob.l,(long int)(param.cache_size*(1<<20)));
 		QD = new double[prob.l];
@@ -1623,6 +1693,7 @@ public:
 
 	Qfloat *get_Q(int i, int len) const
 	{
+	  cTimer lTimer("SVC_Q::get_Q");
 		Qfloat *data;
 		int start, j;
 		if((start = cache->get_data(i,&data,len)) < len)
@@ -1680,16 +1751,19 @@ public:
 			for(j=start;j<len;j++)
 				data[j] = (Qfloat)(this->*kernel_function)(i,j);
 		}
+		
 		return data;
 	}
 
 	double *get_QD() const
 	{
+	  cTimer lTimer("SVC_Q::get_QD");
 		return QD;
 	}
 
 	void swap_index(int i, int j) const
 	{
+	  cTimer lTimer("SVC_Q::swap_index");
 		cache->swap_index(i,j);
 		Kernel::swap_index(i,j);
 		swap(QD[i],QD[j]);
@@ -1739,6 +1813,7 @@ public:
 
 	Qfloat *get_Q(int i, int len) const
 	{
+	  cTimer lTimer("ONE_CLASS_Q::get_Q");
 		Qfloat *data;
 		int j, real_i = index[i];
 		if(cache->get_data(real_i,&data,l) < l)
@@ -1763,6 +1838,7 @@ public:
 
 	~SVR_Q()
 	{
+	  cTimer lTimer("ONE_CLASS_Q::~ONE_CLASS_Q");
 		delete cache;
 		delete[] sign;
 		delete[] index;
@@ -1787,11 +1863,14 @@ static void solve_c_svc(
 	const PREFIX(problem) *prob, const svm_parameter* param,
 	double *alpha, Solver::SolutionInfo* si, double Cp, double Cn, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("solve_c_svc");
 	int l = prob->l;
 	double *minus_ones = new double[l];
 	schar *y = new schar[l];
         double *C = new double[l];
 
+	std::cout << "MLLITE_DBG_SOLVE_C_SVC (l, Cp, Cn) " << l << " " << Cp << " " << Cn << std::endl;
+	
 	int i;
 
 	for(i=0;i<l;i++)
@@ -1836,6 +1915,7 @@ static void solve_nu_svc(
 	const PREFIX(problem) *prob, const svm_parameter *param,
 	double *alpha, Solver::SolutionInfo* si, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("solve_nu_svc");
 	int i;
 	int l = prob->l;
 	double nu = param->nu;
@@ -1900,6 +1980,7 @@ static void solve_one_class(
 	const PREFIX(problem) *prob, const svm_parameter *param,
 	double *alpha, Solver::SolutionInfo* si, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("solve_one_class");
 	int l = prob->l;
 	double *zeros = new double[l];
 	schar *ones = new schar[l];
@@ -1943,6 +2024,7 @@ static void solve_epsilon_svr(
 	const PREFIX(problem) *prob, const svm_parameter *param,
 	double *alpha, Solver::SolutionInfo* si, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("solve_epsilon_svr");
 	int l = prob->l;
 	double *alpha2 = new double[2*l];
 	double *linear_term = new double[2*l];
@@ -1985,6 +2067,7 @@ static void solve_nu_svr(
 	const PREFIX(problem) *prob, const svm_parameter *param,
 	double *alpha, Solver::SolutionInfo* si, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("solve_nu_svr");
 	int l = prob->l;
 	double *C = new double[2*l];
 	double *alpha2 = new double[2*l];
@@ -2041,6 +2124,7 @@ static decision_function svm_train_one(
 	const PREFIX(problem) *prob, const svm_parameter *param,
 	double Cp, double Cn, int *status, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_train_one");
 	double *alpha = Malloc(double,prob->l);
 	Solver::SolutionInfo si;
 	switch(param->svm_type)
@@ -2069,7 +2153,7 @@ static decision_function svm_train_one(
 
         *status |= si.solve_timed_out;
 
-	info("obj = %f, rho = %f\n",si.obj,si.rho);
+	std::cout << "MLLITE_DBG_obj =" << si.obj << ", rho = " << si.rho << "\n";
 
 	// output SVs
 
@@ -2095,8 +2179,8 @@ static decision_function svm_train_one(
 
         free(si.upper_bound);
 
-	info("nSV = %d, nBSV = %d\n",nSV,nBSV);
-
+	std::cout << "MLLITE_DBG_nSV = " << nSV << ", nBSV =" << nBSV << "\n";
+	
 	decision_function f;
 	f.alpha = alpha;
 	f.rho = si.rho;
@@ -2109,6 +2193,7 @@ static void sigmoid_train(
 	int l, const double *dec_values, const double *labels,
 	double& A, double& B)
 {
+  cTimer lTimer("svm_train_one");
 	double prior1=0, prior0 = 0;
 	int i;
 
@@ -2220,6 +2305,7 @@ static void sigmoid_train(
 
 static double sigmoid_predict(double decision_value, double A, double B)
 {
+  cTimer lTimer("sigmoid_predict");
 	double fApB = decision_value*A+B;
 	// 1-p used later; avoid catastrophic cancellation
 	if (fApB >= 0)
@@ -2231,6 +2317,7 @@ static double sigmoid_predict(double decision_value, double A, double B)
 // Method 2 from the multiclass_prob paper by Wu, Lin, and Weng
 static void multiclass_probability(int k, double **r, double *p)
 {
+  cTimer lTimer("multiclass_probability");
 	int t,j;
 	int iter = 0, max_iter=max(100,k);
 	double **Q=Malloc(double *,k);
@@ -2297,13 +2384,14 @@ static void svm_binary_svc_probability(
 	const PREFIX(problem) *prob, const svm_parameter *param,
 	double Cp, double Cn, double& probA, double& probB, int * status, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_binary_svc_probability");
 	int i;
 	int nr_fold = 5;
 	int *perm = Malloc(int,prob->l);
 	double *dec_values = Malloc(double,prob->l);
 
 	cReproducibleRandomNumberGenerator lGen;
-	lGen.set_seed(param->random_seed);
+	lGen.set_seed(1789);
 	
 	// random shuffle
 	for(i=0;i<prob->l;i++) perm[i]=i;
@@ -2371,6 +2459,7 @@ static void svm_binary_svc_probability(
 			subparam.weight_label[1]=-1;
 			subparam.weight[0]=Cp;
 			subparam.weight[1]=Cn;
+			subparam.random_seed = param->random_seed;
 			struct PREFIX(model) *submodel = PREFIX(train)(&subprob,&subparam, status, blas_functions);
 			for(j=begin;j<end;j++)
 			{
@@ -2398,6 +2487,7 @@ static void svm_binary_svc_probability(
 static double svm_svr_probability(
 	const PREFIX(problem) *prob, const svm_parameter *param, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_svr_probability");
 	int i;
 	int nr_fold = 5;
 	double *ymv = Malloc(double,prob->l);
@@ -2432,6 +2522,7 @@ static double svm_svr_probability(
 // perm, length l, must be allocated before calling this subroutine
 static void svm_group_classes(const PREFIX(problem) *prob, int *nr_class_ret, int **label_ret, int **start_ret, int **count_ret, int *perm)
 {
+  cTimer lTimer("svm_group_classes");
 	int l = prob->l;
 	int max_nr_class = 16;
 	int nr_class = 0;
@@ -2509,6 +2600,12 @@ static void svm_group_classes(const PREFIX(problem) *prob, int *nr_class_ret, in
 		start[i] = start[i-1]+count[i-1];
 	}
 
+	for(size_t i=0;i<nr_class;i++) {
+	  ::std::cout << "MLLITE_DBG_SVM_GROUP_CLASSES (nr_class, label, start, count, perm) "
+		      << nr_class << " " << label[i] <<  " " << start[i] <<  " " << count[i]
+		      << " " << perm[i] 
+		      << "'\n" << ::std::flush;
+	}
 	
 	*nr_class_ret = nr_class;
 	*label_ret = label;
@@ -2524,6 +2621,7 @@ static void svm_group_classes(const PREFIX(problem) *prob, int *nr_class_ret, in
 //
 static void remove_zero_weight(PREFIX(problem) *newprob, const PREFIX(problem) *prob)
 {
+  cTimer lTimer("remove_zero_weight");
 	int i;
 	int l = 0;
 	for(i=0;i<prob->l;i++)
@@ -2555,6 +2653,7 @@ static void remove_zero_weight(PREFIX(problem) *newprob, const PREFIX(problem) *
 PREFIX(model) *PREFIX(train)(const PREFIX(problem) *prob, const svm_parameter *param,
         int *status, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_train");
 	PREFIX(problem) newprob;
 	remove_zero_weight(&newprob, prob);
 	prob = &newprob;
@@ -2564,8 +2663,8 @@ PREFIX(model) *PREFIX(train)(const PREFIX(problem) *prob, const svm_parameter *p
 	model->free_sv = 0;	// XXX
 
 #ifdef _DENSE_REP
-	// dump_svm_problem(prob);
-	// dump_svm_parameter(param);
+	dump_svm_problem(prob);
+	dump_svm_parameter(param);
 #endif
 	
 
@@ -2768,8 +2867,8 @@ PREFIX(model) *PREFIX(train)(const PREFIX(problem) *prob, const svm_parameter *p
 			nz_count[i] = nSV;
 		}
 
-                info("Total nSV = %d\n",total_sv);
-
+		std::cout << "MLLITE_DBG_Total nSV = " << total_sv << "\n";
+		
 		model->l = total_sv;
                 model->sv_ind = Malloc(int, total_sv);
 #ifdef _DENSE_REP
@@ -2841,7 +2940,7 @@ PREFIX(model) *PREFIX(train)(const PREFIX(problem) *prob, const svm_parameter *p
 	free(newprob.W);
 
 #ifdef _DENSE_REP
-	// dump_svm_model(model);
+	dump_svm_model(model);
 #endif
 	return model;
 }
@@ -2856,7 +2955,7 @@ void PREFIX(cross_validation)(const PREFIX(problem) *prob, const svm_parameter *
 	int nr_class;
 
 	cReproducibleRandomNumberGenerator lGen;
-	lGen.set_seed(param->random_seed);
+	lGen.set_seed(1789);
 
 	// stratified cv may not give leave-one-out rate
 	// Each class to l folds -> some folds may have zero elements
@@ -3002,6 +3101,7 @@ void PREFIX(get_labels)(const PREFIX(model) *model, int* label)
 
 double PREFIX(get_svr_probability)(const PREFIX(model) *model)
 {
+  cTimer lTimer("svm_get_svr_probability");
 	if ((model->param.svm_type == EPSILON_SVR || model->param.svm_type == NU_SVR) &&
 	    model->probA!=NULL)
 		return model->probA[0];
@@ -3014,6 +3114,7 @@ double PREFIX(get_svr_probability)(const PREFIX(model) *model)
 
 double PREFIX(predict_values)(const PREFIX(model) *model, const PREFIX(node) *x, double* dec_values, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_predict_values");
 	int i;
 	if(model->param.svm_type == ONE_CLASS ||
 	   model->param.svm_type == EPSILON_SVR ||
@@ -3099,6 +3200,7 @@ double PREFIX(predict_values)(const PREFIX(model) *model, const PREFIX(node) *x,
 
 double PREFIX(predict)(const PREFIX(model) *model, const PREFIX(node) *x, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_predict");
 	int nr_class = model->nr_class;
 	double *dec_values;
 	if(model->param.svm_type == ONE_CLASS ||
@@ -3115,6 +3217,7 @@ double PREFIX(predict)(const PREFIX(model) *model, const PREFIX(node) *x, BlasFu
 double PREFIX(predict_probability)(
 	const PREFIX(model) *model, const PREFIX(node) *x, double *prob_estimates, BlasFunctions *blas_functions)
 {
+  cTimer lTimer("svm_predict_probability");
 	if ((model->param.svm_type == C_SVC || model->param.svm_type == NU_SVC) &&
 	    model->probA!=NULL && model->probB!=NULL)
 	{
@@ -3154,6 +3257,7 @@ double PREFIX(predict_probability)(
 
 void PREFIX(free_model_content)(PREFIX(model)* model_ptr)
 {
+  cTimer lTimer("svm_free_model_content");
 	if(model_ptr->free_sv && model_ptr->l > 0 && model_ptr->SV != NULL)
 #ifdef _DENSE_REP
 		for (int i = 0; i < model_ptr->l; i++)
@@ -3198,6 +3302,7 @@ void PREFIX(free_model_content)(PREFIX(model)* model_ptr)
 
 void PREFIX(free_and_destroy_model)(PREFIX(model)** model_ptr_ptr)
 {
+  cTimer lTimer("svm_free_and_destroy_model");
 	if(model_ptr_ptr != NULL && *model_ptr_ptr != NULL)
 	{
 		PREFIX(free_model_content)(*model_ptr_ptr);
@@ -3208,12 +3313,14 @@ void PREFIX(free_and_destroy_model)(PREFIX(model)** model_ptr_ptr)
 
 void PREFIX(destroy_param)(svm_parameter* param)
 {
+  cTimer lTimer("svm_destroy_param");
 	free(param->weight_label);
 	free(param->weight);
 }
 
 const char *PREFIX(check_parameter)(const PREFIX(problem) *prob, const svm_parameter *param)
 {
+  cTimer lTimer("svm_check_parameter");
 	// svm_type
 
 	int svm_type = param->svm_type;

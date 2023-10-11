@@ -167,10 +167,6 @@ void svm_csr_destroy_param(struct svm_parameter *param);
 
 const char *svm_csr_check_parameter(const struct svm_csr_problem *prob, const struct svm_parameter *param);
 
-
-void dump_svm_parameter(const struct svm_parameter *param);
-void dump_svm_problem(const struct svm_problem *prob);
-void dump_svm_model(const struct svm_model *model);
   
 /* end sparse version */
 
