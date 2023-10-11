@@ -422,10 +422,10 @@ cdef class ClassificationCriterion(Criterion):
         self.reset()
         printf("MLLITE_DBG_CLASS_CRITERION_INIT_END y_size=%d start=%d end=%d self_weighted_n_node_samples=%d",
                y.shape[0], start, end, self.weighted_n_node_samples)
-        printf("MLLITE_DBG_ sum_total=[ ");
+        printf(" sum_total=[ ");
         for c in range(self.n_classes[0]):
-                printf("MLLITE_DBG_%g ", self.sum_total[0, c])
-        printf("MLLITE_DBG_]\n")
+                printf("%g ", self.sum_total[0, c])
+        printf("]\n")
 
         return 0
 
@@ -544,7 +544,7 @@ cdef class ClassificationCriterion(Criterion):
 
                 for k in range(self.n_outputs):
                     self.sum_left[k, <SIZE_t> self.y[i, k]] += w
-                    printf("MLLITE_DBG_CLASS_CRITERION UPDATE_ADD_SAMPLE %d %d %g %d\n", p, i, w, <SIZE_t> self.y[i, k])
+                    printf("MLLITE_DBG_CLASS_CRITERION UPDATE_ADD_SAMPLE_LEFT %d %d %g %d\n", p, i, w, <SIZE_t> self.y[i, k])
                     
 		
                 self.weighted_n_left += w
@@ -560,7 +560,7 @@ cdef class ClassificationCriterion(Criterion):
 
                 for k in range(self.n_outputs):
                     self.sum_left[k, <SIZE_t> self.y[i, k]] -= w
-                    printf("MLLITE_DBG_CLASS_CRITERION UPDATE_ADD_SAMPLE %d %d %g %d\n", p, i, w, <SIZE_t> self.y[i, k])
+                    printf("MLLITE_DBG_CLASS_CRITERION UPDATE_ADD_SAMPLE_RIGHT %d %d %g %d\n", p, i, w, <SIZE_t> self.y[i, k])
 
                 self.weighted_n_left -= w
 
