@@ -89,6 +89,7 @@ def inplace_identity_derivative(Z, delta):
          The backpropagated error signal to be modified inplace.
     """
     # Nothing to do
+    print("MLLITE_DBG_INPLACE_IDENTITY_DERIVATIVE")
 
 
 def inplace_logistic_derivative(Z, delta):
@@ -106,6 +107,7 @@ def inplace_logistic_derivative(Z, delta):
     delta : {array-like}, shape (n_samples, n_features)
          The backpropagated error signal to be modified inplace.
     """
+    print("MLLITE_DBG_INPLACE_LOGISTIC_DERIVATIVE")
     delta *= Z
     delta *= 1 - Z
 
@@ -125,6 +127,7 @@ def inplace_tanh_derivative(Z, delta):
     delta : {array-like}, shape (n_samples, n_features)
          The backpropagated error signal to be modified inplace.
     """
+    print("MLLITE_DBG_INPLACE_TANH_DERIVATIVE")
     delta *= 1 - Z**2
 
 
@@ -143,6 +146,7 @@ def inplace_relu_derivative(Z, delta):
     delta : {array-like}, shape (n_samples, n_features)
          The backpropagated error signal to be modified inplace.
     """
+    print("MLLITE_DBG_INPLACE_RELU_DERIVATIVE")
     delta[Z == 0] = 0
 
 

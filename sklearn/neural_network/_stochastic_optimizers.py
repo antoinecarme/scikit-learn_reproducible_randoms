@@ -47,6 +47,8 @@ class BaseOptimizer:
         """Perform update to learning rate and potentially other states at the
         end of an iteration
         """
+        print("MLLITE_DBG_OPTIMIZER_ITERATION_ENDS", time_step)
+        
         pass
 
     def trigger_stopping(self, msg, verbose):

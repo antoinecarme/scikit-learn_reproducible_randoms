@@ -170,20 +170,28 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         activations : list, length = n_layers - 1
             The ith element of the list holds the values of the ith layer.
         """
+        print("MLLITE_DBG_FORWARD_PASS_START")
         hidden_activation = ACTIVATIONS[self.activation]
         # Iterate over the hidden layers
         for i in range(self.n_layers_ - 1):
+            print("MLLITE_DBG_FORWARD_PASS_LAYER_INPUT " + self.get_layer_name(i + 1) + " " , [x for x in activations[i][0]][:12])
+            print("MLLITE_DBG_FORWARD_PASS_LAYER_COEFFS " + self.get_layer_name(i + 1) + " " , [x for x in self.coefs_[i][0]][:12])
+            print("MLLITE_DBG_FORWARD_PASS_LAYER_INTERCEPTS " + self.get_layer_name(i + 1) + " " , [x for x in self.intercepts_[i]][:12])
             activations[i + 1] = safe_sparse_dot(activations[i], self.coefs_[i])
             activations[i + 1] += self.intercepts_[i]
 
             # For the hidden layers
             if (i + 1) != (self.n_layers_ - 1):
                 hidden_activation(activations[i + 1])
+                print("MLLITE_DBG_FORWARD_PASS_LAYER_OUTPUT " + self.get_layer_name(i + 1) + " " , [x for x in activations[i+1][0]][:12])
+
 
         # For the last layer
         output_activation = ACTIVATIONS[self.out_activation_]
         output_activation(activations[i + 1])
+        print("MLLITE_DBG_FORWARD_PASS_LAYER_OUTPUT " + self.get_layer_name(i + 1) + " " , [x for x in activations[i+1][0]][:12])
 
+        print("MLLITE_DBG_FORWARD_PASS_END")
         return activations
 
     def _forward_pass_fast(self, X, check_input=True):
@@ -231,11 +239,18 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
 
         This function does backpropagation for the specified one layer.
         """
+        print("MLLITE_DBG_COMPUTE_LOSS_GRAD_START " + self.get_layer_name(layer) + "")
+        print("MLLITE_DBG_COMPUTE_LOSS_GRAD_ACTIVATIONS " + self.get_layer_name(layer) , [x for x in activations[layer][0]][:12])
+        print("MLLITE_DBG_COMPUTE_LOSS_GRAD_DELTAS " + self.get_layer_name(layer) , [x for x in deltas[layer][0]][:12])
+        print("MLLITE_DBG_COMPUTE_LOSS_GRAD_COEFFS " + self.get_layer_name(layer) , [x for x in self.coefs_[layer][0]][:12])
+
         coef_grads[layer] = safe_sparse_dot(activations[layer].T, deltas[layer])
         coef_grads[layer] += self.alpha * self.coefs_[layer]
         coef_grads[layer] /= n_samples
 
         intercept_grads[layer] = np.mean(deltas[layer], 0)
+        self.dump_layer(layer, coef_grads[layer], intercept_grads[layer], label = "Gradients")
+        print("MLLITE_DBG_COMPUTE_LOSS_GRAD_END " + self.get_layer_name(layer) )
 
     def _loss_grad_lbfgs(
         self, packed_coef_inter, X, y, activations, deltas, coef_grads, intercept_grads
@@ -323,6 +338,7 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         coef_grads : list, length = n_layers - 1
         intercept_grads : list, length = n_layers - 1
         """
+        print("MLLITE_DBG_BACK_PROP_START")
         n_samples = X.shape[0]
 
         # Forward propagate
@@ -348,7 +364,8 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         # sigmoid and binary cross entropy, softmax and categorical cross
         # entropy, and identity with squared loss
         deltas[last] = activations[-1] - y
-
+        print("MLLITE_DBG_LAST_ACTIVATION" , [x for x in activations[-1][0]][:12])
+        print("MLLITE_DBG_ENCODED_TARGET" , [x for x in y[0]][:12])
         # Compute gradient for the last layer
         self._compute_loss_grad(
             last, n_samples, activations, deltas, coef_grads, intercept_grads
@@ -356,13 +373,21 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         inplace_derivative = DERIVATIVES[self.activation]
         # Iterate over the hidden layers
         for i in range(self.n_layers_ - 2, 0, -1):
+            print("MLLITE_DBG_UPDATE_DELTAS_START", self.get_layer_name(i))
+            print("MLLITE_DBG_UPDATE_NEXT_LAYER_COEFFS", self.get_layer_name(i), self.coefs_[i][0,:])
+            print("MLLITE_DBG_UPDATE_NEXT_LAYER_DELTAS", self.get_layer_name(i), deltas[i][0,:])
             deltas[i - 1] = safe_sparse_dot(deltas[i], self.coefs_[i].T)
+            print("MLLITE_DBG_UPDATE_DELTAS_NEW", self.get_layer_name(i), deltas[i-1][0,:])
+            print("MLLITE_DBG_UPDATE_DELTAS_ACTIVATIONS", self.get_layer_name(i), activations[i][0,:])
             inplace_derivative(activations[i], deltas[i - 1])
+            print("MLLITE_DBG_UPDATE_DELTAS_NEW_DERIVATIVE", self.get_layer_name(i), deltas[i-1][0,:])
+            print("MLLITE_DBG_UPDATE_DELTAS_END", self.get_layer_name(i))
 
             self._compute_loss_grad(
                 i - 1, n_samples, activations, deltas, coef_grads, intercept_grads
             )
 
+        print("MLLITE_DBG_BACK_PROP_END")
         return loss, coef_grads, intercept_grads
 
     def get_layer_name(self, i):
@@ -373,19 +398,23 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
             name = "Output_Layer"
         else: 
             name = "Hidden_Layer_" + str(i)
-        return name
+        return "'" + name + "'"
+
+    def round_for_log(self, x):
+        return np.round(x, 6)
     
-    def dump_layer(self, i, coefs, intercepts):
-        pass
-    
-    def dump_layer__(self, i, coefs, intercepts):
+    def dump_layer(self, i, coefs, intercepts, label = ""):
         name = self.get_layer_name(i)
-        print("DUMP_LAYER_START '" + name + "'")
-        print("DUMP_LAYER_INPUTS_OUTPUTS", coefs.shape[0], coefs.shape[1] )
-        for i in range(coefs.shape[0]):
-            print("DUMP_LAYER_COEFFS", i,   coefs[i, :])
-        print("DUMP_LAYER_INTERCEPTS", intercepts)    
-        print("DUMP_LAYER_END '" + name + "'")
+        extra = ""
+        if(len(label) > 0):
+            name = name[1:-1] + "_" + label
+            extra = "PARAMS_"
+        print("MLLITE_DBG_DUMP_LAYER_" + extra + "START " + name)
+        print("MLLITE_DBG_DUMP_LAYER_" + extra + "INPUTS_OUTPUTS", coefs.shape[0], coefs.shape[1] )
+        for i in range(min(5, coefs.shape[0])):
+            print("MLLITE_DBG_DUMP_LAYER_" + extra + "COEFFS", i,   [self.round_for_log(x) for x in coefs[i, :][:12]])
+        print("MLLITE_DBG_DUMP_LAYER_" + extra + "INTERCEPTS", [self.round_for_log(x) for x in intercepts[:12]])    
+        print("MLLITE_DBG_DUMP_LAYER_" + extra + "END " + name )
 
     def _initialize(self, y, layer_units, dtype):
         # set all attributes, allocate weights etc. for first call
@@ -421,7 +450,7 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
             )
             self.coefs_.append(coef_init)
             self.intercepts_.append(intercept_init)
-            self.dump_layer(i, coef_init, intercept_init)
+            self.dump_layer(i + 1, coef_init, intercept_init)
 
 
         if self.solver in _STOCHASTIC_SOLVERS:
@@ -493,13 +522,19 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         deltas = [None] * (len(activations) - 1)
 
         coef_grads = [
-            np.empty((n_fan_in_, n_fan_out_), dtype=X.dtype)
+            np.zeros((n_fan_in_, n_fan_out_), dtype=X.dtype)
             for n_fan_in_, n_fan_out_ in zip(layer_units[:-1], layer_units[1:])
         ]
 
         intercept_grads = [
-            np.empty(n_fan_out_, dtype=X.dtype) for n_fan_out_ in layer_units[1:]
+            np.zeros(n_fan_out_, dtype=X.dtype) for n_fan_out_ in layer_units[1:]
         ]
+
+        for i in range(len(coef_grads)):
+            print("MLLITE_DBG_INITIALIZE_GRADIENTS_START " + self.get_layer_name(i) )
+            self.dump_layer(i, coef_grads[i], intercept_grads[i], label = "Gradients")
+            print("MLLITE_DBG_INITIALIZE_GRADIENTS_END " + self.get_layer_name(i) )
+
 
         # Run the Stochastic optimization solver
         if self.solver in _STOCHASTIC_SOLVERS:
@@ -588,6 +623,7 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
         layer_units,
         incremental,
     ):
+        print("MLLITE_DBG_FIT_STOCHASTIC_START")
         params = self.coefs_ + self.intercepts_
         if not incremental or not hasattr(self, "_optimizer"):
             if self.solver == "sgd":
@@ -675,7 +711,13 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
 
                     # update weights
                     grads = coef_grads + intercept_grads
+                    print("MLLITE_DBG_OPTIMIZER_UPDATE_PARAMS_START")
+                    for i in range(len(coef_grads)):
+                        self.dump_layer(i+1, self.coefs_[i], self.intercepts_[i], label = "before_update")
                     self._optimizer.update_params(params, grads)
+                    for i in range(len(coef_grads)):
+                        self.dump_layer(i+1, self.coefs_[i], self.intercepts_[i], label = "after_update")
+                    print("MLLITE_DBG_OPTIMIZER_UPDATE_PARAMS_END")
 
                 self.n_iter_ += 1
                 self.loss_ = accumulated_loss / X.shape[0]
@@ -690,7 +732,7 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
                 self._update_no_improvement_count(early_stopping, X_val, y_val)
 
                 for i in range(len(self.coefs_)):
-                    self.dump_layer(i+1, self.coefs_[i], self.intercepts_[i])
+                    self.dump_layer(i, self.coefs_[i], self.intercepts_[i])
 
 
                 # for learning rate that needs to be updated at iteration end
@@ -736,6 +778,9 @@ class BaseMultilayerPerceptron(BaseEstimator, metaclass=ABCMeta):
             self.coefs_ = self._best_coefs
             self.intercepts_ = self._best_intercepts
             self.validation_scores_ = self.validation_scores_
+
+        print("MLLITE_DBG_FIT_STOCHASTIC_END")
+
 
     def _update_no_improvement_count(self, early_stopping, X_val, y_val):
         if early_stopping:
