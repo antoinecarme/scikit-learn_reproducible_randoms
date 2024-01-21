@@ -49,6 +49,9 @@ import numpy as np
 from scipy.sparse import hstack as sparse_hstack
 from scipy.sparse import issparse
 
+import reproducible_random as rep_rand
+import sys
+
 from ..base import (
     ClassifierMixin,
     MultiOutputMixin,
@@ -129,9 +132,9 @@ def _generate_sample_indices(random_state, n_samples, n_samples_bootstrap):
     """
     Private function used to _parallel_build_trees function."""
 
-    random_instance = check_random_state(random_state)
-    sample_indices = random_instance.randint(0, n_samples, n_samples_bootstrap)
-
+    random_instance = random_state
+    sample_indices = random_instance.generate_int_sequence(0, n_samples, n_samples_bootstrap)
+    sample_indices = sample_indices.astype(np.int64)
     return sample_indices
 
 
@@ -177,9 +180,12 @@ def _parallel_build_trees(
         indices = _generate_sample_indices(
             tree.random_state, n_samples, n_samples_bootstrap
         )
+        print("MLLITE_DBG_BUILD_TREE_IDX_SAMPLES", tree_idx, tree.random_state.get_seed(), n_samples, indices[:200])
+        sys.stdout.flush()
         sample_counts = np.bincount(indices, minlength=n_samples)
         curr_sample_weight *= sample_counts
-
+        print("MLLITE_DBG_BUILD_TREE_IDX_SAMPLE_WEIGHTS", tree_idx, tree.random_state.get_seed(), n_samples, curr_sample_weight[:200])
+        sys.stdout.flush()
         if class_weight == "subsample":
             with catch_warnings():
                 simplefilter("ignore", DeprecationWarning)
@@ -187,13 +193,21 @@ def _parallel_build_trees(
         elif class_weight == "balanced_subsample":
             curr_sample_weight *= compute_sample_weight("balanced", y, indices=indices)
 
+        X1 = X.copy()
+        y1 = y.copy()
+        for i in range(len(indices)):
+            for j in range(X1.shape[1]):
+                X1[i, j] = X[indices[i], j]
+            y1[i] = y[indices[i]]
+        print("TREE_FIT_X_SHAPE_Y_SHAPE", X.shape, y.shape, X1.shape, y1.shape)
+        print("TREE_FIT_X_FLAGS_Y_FLAGS", X.flags, y.flags, X1.flags, y1.flags)
+        sys.stdout.flush()
+        curr_sample_weight = None
         tree._fit(
-            X,
-            y,
-            sample_weight=curr_sample_weight,
-            check_input=False,
-            missing_values_in_feature_mask=missing_values_in_feature_mask,
+            X1,
+            y1,
         )
+        sys.stdout.flush()
     else:
         tree._fit(
             X,
@@ -203,6 +217,7 @@ def _parallel_build_trees(
             missing_values_in_feature_mask=missing_values_in_feature_mask,
         )
 
+    sys.stdout.flush()
     return tree
 
 
@@ -447,7 +462,7 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
         if not self.bootstrap and self.oob_score:
             raise ValueError("Out of bag estimation only available if bootstrap=True")
 
-        random_state = check_random_state(self.random_state)
+        random_state = self.random_state
 
         if not self.warm_start or not hasattr(self, "estimators_"):
             # Free allocated memory, if any
@@ -477,6 +492,17 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
                 self._make_estimator(append=False, random_state=random_state)
                 for i in range(n_more_estimators)
             ]
+
+            # Use seeds that are dependent on the model random state.
+            # override previous ones.
+            lGen = rep_rand.ReproducibleGenerator()
+            lGen.set_seed(1789);
+            for t in trees:
+                lSeed_t = lGen.rand_int(0, 4294967295)
+                lGen_t = rep_rand.ReproducibleGenerator();
+                lGen_t.set_seed(lSeed_t);
+                t.random_state = lGen_t
+
 
             # Parallel loop: we prefer the threading backend as the Cython code
             # for fitting the trees is internally releasing the Python GIL
@@ -536,6 +562,7 @@ class BaseForest(MultiOutputMixin, BaseEnsemble, metaclass=ABCMeta):
             self.n_classes_ = self.n_classes_[0]
             self.classes_ = self.classes_[0]
 
+        sys.stdout.flush()
         return self
 
     @abstractmethod
@@ -2896,7 +2923,7 @@ class RandomTreesEmbedding(TransformerMixin, BaseForest):
         X_transformed : sparse matrix of shape (n_samples, n_out)
             Transformed dataset.
         """
-        rnd = check_random_state(self.random_state)
+        rnd = self.random_state
         y = rnd.uniform(size=_num_samples(X))
         super().fit(X, y, sample_weight=sample_weight)
 

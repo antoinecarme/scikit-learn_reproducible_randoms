@@ -188,7 +188,8 @@ class BaseEnsemble(MetaEstimatorMixin, BaseEstimator, metaclass=ABCMeta):
         estimator.set_params(**{p: getattr(self, p) for p in self.estimator_params})
 
         if random_state is not None:
-            _set_random_states(estimator, random_state)
+            # _set_random_states(estimator, random_state)
+            pass
 
         if append:
             self.estimators_.append(estimator)
