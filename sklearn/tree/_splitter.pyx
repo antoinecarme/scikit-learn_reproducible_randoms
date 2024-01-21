@@ -69,7 +69,7 @@ cdef class Splitter:
         SIZE_t max_features,
         SIZE_t min_samples_leaf,
         double min_weight_leaf,
-        object random_state,
+        SIZE_t random_state,
         const cnp.int8_t[:] monotonic_cst,
     ):
         """
@@ -107,7 +107,7 @@ cdef class Splitter:
         self.max_features = max_features
         self.min_samples_leaf = min_samples_leaf
         self.min_weight_leaf = min_weight_leaf
-        self.random_state = random_state
+        self.random_state = <SIZE_t> random_state
         self.monotonic_cst = monotonic_cst
         self.with_monotonic_cst = monotonic_cst is not None
 
@@ -341,7 +341,8 @@ cdef inline int node_split_best(
     cdef SIZE_t p_prev
 
     cdef cReproducibleRandomNumberGenerator lGen
-    lGen.set_seed(1789)
+    # cdef SIZE_t lSeed = <SIZE_t> splitter.random_state
+    lGen.set_seed(splitter.random_state)
 
 
     cdef SIZE_t n_visited_features = 0
@@ -466,12 +467,9 @@ cdef inline int node_split_best(
                 if n_left < min_samples_leaf or n_right < min_samples_leaf:
                     continue
 
-                printf("MLLITE_DBG_SPLITTER_BEST_CURRENT_SPLIT_POS %d %d %d\n", f_j, features[f_j], p)
                 
                 current_split.pos = p
                 criterion.update(current_split.pos)
-                printf("MLLITE_DBG_SPLITTER_CRITERION_AFTER_UPDATE_WEIGHT_LEFT_RIGHT %d %d %g %g\n",
-                       f_j, features[f_j], criterion.weighted_n_left, criterion.weighted_n_right)
                 
 
                 # Reject if monotonicity constraints are not satisfied
@@ -714,7 +712,8 @@ cdef inline int node_split_random(
     cdef SIZE_t end = splitter.end
 
     cdef cReproducibleRandomNumberGenerator lGen
-    lGen.set_seed(1789)
+    # cdef SIZE_t lSeed =  <SIZE_t> splitter.random_state
+    lGen.set_seed(splitter.random_state)
 
     cdef SIZE_t[::1] features = splitter.features
     cdef SIZE_t[::1] constant_features = splitter.constant_features
@@ -1011,15 +1010,11 @@ cdef class DensePartitioner:
             SIZE_t end_non_missing = self.end - self.n_missing
 
 
-        printf("MLLITE_DBG_DENSE_PARTITIONER NEXT_P_START %d %d %d %d %d\n", p_prev[0], p[0], self.end, self.n_missing, end_non_missing) 
-
 
         while (
             p[0] + 1 < end_non_missing and
             feature_values[p[0] + 1] <= feature_values[p[0]] + FEATURE_THRESHOLD
         ):
-            printf("MLLITE_DBG_DENSE_PARTITIONER NEXT_P_DETAIL %d %g %g %g\n", p[0],
-                   feature_values[p[0] + 1], feature_values[p[0]], FEATURE_THRESHOLD)
             p[0] += 1
 
 
@@ -1028,7 +1023,6 @@ cdef class DensePartitioner:
         # By adding 1, we have
         # (feature_values[p] >= end) or (feature_values[p] > feature_values[p - 1])
         p[0] += 1
-        printf("MLLITE_DBG_DENSE_PARTITIONER NEXT_P_END %d %d %d %d %d\n", p_prev[0], p[0], self.end, self.n_missing, end_non_missing) 
 
     cdef inline SIZE_t partition_samples(self, double current_threshold) noexcept nogil:
         """Partition samples for feature_values at the current_threshold."""

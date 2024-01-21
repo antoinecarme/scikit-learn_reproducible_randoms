@@ -237,7 +237,7 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         check_input=True,
         missing_values_in_feature_mask=None,
     ):
-        random_state = check_random_state(self.random_state)
+        random_state = self.random_state
 
         if check_input:
             # Need to validate separately here.
@@ -450,13 +450,17 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                 # *positive class*, all signs must be flipped.
                 monotonic_cst *= -1
 
+        lSeed = random_state
+        if(not isinstance(lSeed, int)):
+            lSeed = random_state.get_seed()
+
         if not isinstance(self.splitter, Splitter):
             splitter = SPLITTERS[self.splitter](
                 criterion,
                 self.max_features_,
                 min_samples_leaf,
                 min_weight_leaf,
-                random_state,
+                lSeed,
                 monotonic_cst,
             )
 

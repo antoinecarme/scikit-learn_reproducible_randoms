@@ -25,16 +25,12 @@ namespace rep {
     size_t rand_int(size_t low, size_t high) {
       auto lDist = ::std::uniform_int_distribution<size_t>(low, high - 1);
       auto int_rand = lDist(mGenerator);
-      ::std::cout << "cReproducibleRandomNumberGenerator RAND_INT " << low << " " << high
-		  << " " << int_rand << std::endl << std::flush;
       return int_rand;
     }
 
     double rand_uniform(double min_value, double max_value) {
       auto lDist = ::std::uniform_real_distribution<double>(min_value,max_value);
       auto real_rand = lDist(mGenerator);
-      ::std::cout << "cReproducibleRandomNumberGenerator RAND_UNIFORM " << min_value << " " << max_value
-		  << " " << real_rand << std::endl << std::flush;
       return real_rand;
     }
 

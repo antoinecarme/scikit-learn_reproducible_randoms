@@ -45,7 +45,7 @@ cdef class Splitter:
     cdef public SIZE_t min_samples_leaf  # Min samples in a leaf
     cdef public double min_weight_leaf   # Minimum weight in a leaf
 
-    cdef object random_state             # Random state
+    cdef SIZE_t random_state             # Random state
     cdef UINT32_t rand_r_state           # sklearn_rand_r random number state
 
     cdef SIZE_t[::1] samples             # Sample indices in X, y
