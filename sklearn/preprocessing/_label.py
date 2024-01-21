@@ -81,7 +81,7 @@ class LabelEncoder(TransformerMixin, BaseEstimator, auto_wrap_output_keys=None):
     ['tokyo', 'tokyo', 'paris']
     """
 
-    def fit(self, y):
+    def fit(self, y, *args, **kwargs):
         """Fit label encoder.
 
         Parameters
@@ -98,7 +98,7 @@ class LabelEncoder(TransformerMixin, BaseEstimator, auto_wrap_output_keys=None):
         self.classes_ = _unique(y)
         return self
 
-    def fit_transform(self, y):
+    def fit_transform(self, y, *args, **kwargs):
         """Fit label encoder and return encoded labels.
 
         Parameters
@@ -115,7 +115,7 @@ class LabelEncoder(TransformerMixin, BaseEstimator, auto_wrap_output_keys=None):
         self.classes_, y = _unique(y, return_inverse=True)
         return y
 
-    def transform(self, y):
+    def transform(self, y, *args, **kwargs):
         """Transform labels to normalized encoding.
 
         Parameters
@@ -136,7 +136,7 @@ class LabelEncoder(TransformerMixin, BaseEstimator, auto_wrap_output_keys=None):
 
         return _encode(y, uniques=self.classes_)
 
-    def inverse_transform(self, y):
+    def inverse_transform(self, y, *args, **kwargs):
         """Transform labels back to original encoding.
 
         Parameters
