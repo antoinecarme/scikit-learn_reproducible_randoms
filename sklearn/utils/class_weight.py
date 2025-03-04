@@ -1,11 +1,13 @@
-# Authors: Andreas Mueller
-#          Manoj Kumar
-# License: BSD 3 clause
+"""Utilities for handling weights based on class labels."""
+
+# Authors: The scikit-learn developers
+# SPDX-License-Identifier: BSD-3-Clause
 
 import numpy as np
 from scipy import sparse
 
 from ._param_validation import StrOptions, validate_params
+from .validation import _check_sample_weight
 
 
 @validate_params(
@@ -13,17 +15,19 @@ from ._param_validation import StrOptions, validate_params
         "class_weight": [dict, StrOptions({"balanced"}), None],
         "classes": [np.ndarray],
         "y": ["array-like"],
+        "sample_weight": ["array-like", None],
     },
     prefer_skip_nested_validation=True,
 )
-def compute_class_weight(class_weight, *, classes, y):
+def compute_class_weight(class_weight, *, classes, y, sample_weight=None):
     """Estimate class weights for unbalanced datasets.
 
     Parameters
     ----------
     class_weight : dict, "balanced" or None
         If "balanced", class weights will be given by
-        `n_samples / (n_classes * np.bincount(y))`.
+        `n_samples / (n_classes * np.bincount(y))` or their weighted equivalent if
+        `sample_weight` is provided.
         If a dictionary is given, keys are classes and values are corresponding class
         weights.
         If `None` is given, the class weights will be uniform.
@@ -35,6 +39,10 @@ def compute_class_weight(class_weight, *, classes, y):
     y : array-like of shape (n_samples,)
         Array of original class labels per sample.
 
+    sample_weight : array-like of shape (n_samples,), default=None
+        Array of weights that are assigned to individual samples. Only used when
+        `class_weight='balanced'`.
+
     Returns
     -------
     class_weight_vect : ndarray of shape (n_classes,)
@@ -44,6 +52,14 @@ def compute_class_weight(class_weight, *, classes, y):
     ----------
     The "balanced" heuristic is inspired by
     Logistic Regression in Rare Events Data, King, Zen, 2001.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sklearn.utils.class_weight import compute_class_weight
+    >>> y = [1, 1, 1, 1, 0, 0]
+    >>> compute_class_weight(class_weight="balanced", classes=np.unique(y), y=y)
+    array([1.5 , 0.75])
     """
     # Import error caused by circular imports.
     from ..preprocessing import LabelEncoder
@@ -57,10 +73,14 @@ def compute_class_weight(class_weight, *, classes, y):
         # Find the weight of each class as present in y.
         le = LabelEncoder()
         y_ind = le.fit_transform(y)
-        if not all(np.in1d(classes, le.classes_)):
+        if not all(np.isin(classes, le.classes_)):
             raise ValueError("classes should have valid labels that are in y")
 
-        recip_freq = len(y) / (len(le.classes_) * np.bincount(y_ind).astype(np.float64))
+        sample_weight = _check_sample_weight(sample_weight, y)
+        weighted_class_counts = np.bincount(y_ind, weights=sample_weight)
+        recip_freq = weighted_class_counts.sum() / (
+            len(le.classes_) * weighted_class_counts
+        )
         weight = recip_freq[le.transform(classes)]
     else:
         # user-defined dictionary
@@ -128,6 +148,13 @@ def compute_sample_weight(class_weight, y, *, indices=None):
     -------
     sample_weight_vect : ndarray of shape (n_samples,)
         Array with sample weights as applied to the original `y`.
+
+    Examples
+    --------
+    >>> from sklearn.utils.class_weight import compute_sample_weight
+    >>> y = [1, 1, 1, 1, 0, 0]
+    >>> compute_sample_weight(class_weight="balanced", y=y)
+    array([0.75, 0.75, 0.75, 0.75, 1.5 , 1.5 ])
     """
 
     # Ensure y is 2D. Sparse matrices are already 2D.
@@ -157,10 +184,11 @@ def compute_sample_weight(class_weight, y, *, indices=None):
 
     expanded_class_weight = []
     for k in range(n_outputs):
-        y_full = y[:, k]
-        if sparse.issparse(y_full):
+        if sparse.issparse(y):
             # Ok to densify a single column at a time
-            y_full = y_full.toarray().flatten()
+            y_full = y[:, [k]].toarray().flatten()
+        else:
+            y_full = y[:, k]
         classes_full = np.unique(y_full)
         classes_missing = None
 
@@ -194,7 +222,7 @@ def compute_sample_weight(class_weight, y, *, indices=None):
 
         if classes_missing:
             # Make missing classes' weight zero
-            weight_k[np.in1d(y_full, list(classes_missing))] = 0.0
+            weight_k[np.isin(y_full, list(classes_missing))] = 0.0
 
         expanded_class_weight.append(weight_k)
 
